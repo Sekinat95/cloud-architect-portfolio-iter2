@@ -9,7 +9,7 @@ This is the replication of a project I designed and implemented during my PhD in
 ### Architectural Overview
 The overview of the end to end pipeline of the XR EE system(ML-side) is available at:
 
-```
+```mermaid
 graph TD
   GCS["Raw XR service time series data"] --> EEPL
     subgraph EEPL["End-to-end pipeline"]
