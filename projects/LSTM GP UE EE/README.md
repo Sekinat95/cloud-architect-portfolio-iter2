@@ -7,7 +7,27 @@ This is the replication of a project I designed and implemented during my PhD in
 #### ML-driven EE
 
 ### Architectural Overview
-The overview of the end to end pipeline of the XR EE system(ML-side) is available at [Overview diagram](./diagrams/architecture-overview.mmd)
+The overview of the end to end pipeline of the XR EE system(ML-side) is available at:
+
+```
+graph TD
+  GCS["Raw XR service time series data"] --> EEPL
+    subgraph EEPL["End-to-end pipeline"]
+      PRS["Processed data"] -->GP & LSTM
+      GP["Guassian process regression <br/> training"] --> GPOUT
+      LSTM["Long Short Term Memory <br/> training"] --> LSTMOUT
+      GPOUT["GP Batch Inference"] --> MDLUGP
+      LSTMOUT["LSTM Batch Inference"] --> MDLULSTM
+      MDLUGP["GP Model upload <br/> VA Model Registry"] --> TEST
+      MDLULSTM["LSTM Model Upload"] --> TEST
+    end
+    subgraph TEST["Metric Calculations "]
+    end
+    subgraph TRDWN["Tear down"]
+    end
+
+  GCS --> EEPL --> TEST --> TRDWN
+```
 ## Scope
 ### Sections and Components
 #### Monitoring
