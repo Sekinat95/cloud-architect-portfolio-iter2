@@ -81,7 +81,7 @@ job = aiplatform.PipelineJob(
         "pipeline_run_id": PIPELINE_RUN_ID,
         "model_version": "v1",
         "lstm_lookback": 1,
-        "gp_n_samples": 5000,#10000,
+        "gp_n_samples": 1000,#10000,
         "gp_train_prop": 0.7,
         "lstm_input_size": 1,
         "lstm_hidden_size": 200,
