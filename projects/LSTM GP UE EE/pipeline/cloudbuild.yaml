@@ -1,0 +1,41 @@
+steps:
+  # ------------------------------------------------------------------ #
+  # Step 1 — Install dependencies, compile and submit pipeline
+  # Cloud Build steps do not share pip installs — install and execute
+  # in the same step using bash -c
+  # ------------------------------------------------------------------ #
+  - name: "python:3.10-slim"
+    id: "compile-and-submit"
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        pip install --quiet \
+          kfp==2.7.0 \
+          google-cloud-aiplatform==1.38.1 \
+          google-cloud-storage==2.14.0 && \
+        cd projects/06-phd-to-gcp-xr-ml-drx/pipeline && \
+        python run_pipeline.py
+
+  # ------------------------------------------------------------------ #
+  # Step 2 — Upload compiled pipeline YAML to GCS
+  # ------------------------------------------------------------------ #
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: "upload-pipeline-yaml"
+    args:
+      - storage
+      - cp
+      - projects/LSTM GP UE EE/pipeline/pipeline.yaml
+      - gs://lstm-gp-xr-ue-ee-pipeline-root/compiled/pipeline.yaml
+
+# ------------------------------------------------------------------ #
+# Cloud Build config
+# ------------------------------------------------------------------ #
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _PROJECT_ID: "lstm-gp-xr-ue-ee"
+  _REGION: "europe-west4"
+
+serviceAccount: "projects/lstm-gp-xr-ue-ee/serviceAccounts/full-mlops-pipeline-sa@lstm-gp-xr-ue-ee.iam.gserviceaccount.com"

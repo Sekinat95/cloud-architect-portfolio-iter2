@@ -1,0 +1,1165 @@
+# PIPELINE DEFINITION
+# Name: xr-traffic-mlops-pipeline
+# Description: Full MLOps pipeline for XR network traffic arrival time prediction. Trains LSTM and GP Regressor models in parallel, evaluates RMSE, registers both models in Vertex AI Model Registry, runs batch inference, and writes predictions to BigQuery.
+# Inputs:
+#    bq_dataset: str [Default: 'xr_predictions']
+#    gp_n_restarts_optimizer: int [Default: 10.0]
+#    gp_n_samples: int [Default: 1000.0]
+#    gp_normalize_y: bool [Default: True]
+#    gp_train_prop: float [Default: 0.7]
+#    lstm_batch_size: int [Default: 128.0]
+#    lstm_hidden_size: int [Default: 200.0]
+#    lstm_input_size: int [Default: 1.0]
+#    lstm_learning_rate: float [Default: 0.004]
+#    lstm_lookback: int [Default: 1.0]
+#    lstm_num_epochs: int [Default: 18.0]
+#    lstm_num_stacked_layers: int [Default: 1.0]
+#    model_artefacts_bucket: str
+#    model_version: str [Default: 'v1']
+#    pipeline_root_bucket: str
+#    pipeline_run_id: str [Default: 'run-001']
+#    processed_bucket: str
+#    project_id: str
+#    raw_data_bucket: str
+#    region: str
+#    test_gcs_path: str [Default: 'xr-traffic/concatenated_df_DN_test.csv']
+#    train_gcs_path: str [Default: 'xr-traffic/concatenated_df_DN_train.csv']
+components:
+  comp-batch-inference:
+    executorLabel: exec-batch-inference
+    inputDefinitions:
+      artifacts:
+        gp_model_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_model_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        bq_dataset:
+          parameterType: STRING
+        lstm_lookback:
+          defaultValue: 1.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        model_artefacts_bucket:
+          parameterType: STRING
+        model_version:
+          parameterType: STRING
+        pipeline_run_id:
+          parameterType: STRING
+        processed_bucket:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        gp_inference_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_inference_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-evaluate:
+    executorLabel: exec-evaluate
+    inputDefinitions:
+      artifacts:
+        gp_metrics_input:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        lstm_metrics_input:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        combined_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-gp-training:
+    executorLabel: exec-gp-training
+    inputDefinitions:
+      artifacts:
+        gp_test_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        gp_train_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        model_artefacts_bucket:
+          parameterType: STRING
+        n_restarts_optimizer:
+          defaultValue: 10.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        normalize_y:
+          defaultValue: true
+          isOptional: true
+          parameterType: BOOLEAN
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        gp_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        gp_model_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-lstm-training:
+    executorLabel: exec-lstm-training
+    inputDefinitions:
+      artifacts:
+        lstm_scaler_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_test_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_train_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        batch_size:
+          defaultValue: 128.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        hidden_size:
+          defaultValue: 200.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        input_size:
+          defaultValue: 1.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        learning_rate:
+          defaultValue: 0.004
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        lookback:
+          defaultValue: 1.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        model_artefacts_bucket:
+          parameterType: STRING
+        num_epochs:
+          defaultValue: 18.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        num_stacked_layers:
+          defaultValue: 1.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        lstm_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        lstm_model_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-model-upload:
+    executorLabel: exec-model-upload
+    inputDefinitions:
+      artifacts:
+        gp_model_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_model_input:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+      parameters:
+        model_artefacts_bucket:
+          parameterType: STRING
+        pipeline_run_id:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        region:
+          parameterType: STRING
+  comp-preprocessing:
+    executorLabel: exec-preprocessing
+    inputDefinitions:
+      parameters:
+        gp_n_samples:
+          defaultValue: 5000.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        gp_train_prop:
+          defaultValue: 0.7
+          isOptional: true
+          parameterType: NUMBER_DOUBLE
+        lstm_lookback:
+          defaultValue: 1.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        processed_bucket:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        raw_data_bucket:
+          parameterType: STRING
+        test_gcs_path:
+          parameterType: STRING
+        train_gcs_path:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        gp_test_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        gp_train_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_scaler_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_test_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+        lstm_train_output:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-batch-inference:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - batch_inference
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==1.26.4'\
+          \ 'pandas==2.1.4' 'torch==2.1.2' 'scikit-learn==1.3.2' 'google-cloud-storage==2.14.0'\
+          \ 'google-cloud-bigquery==3.14.1' 'pyarrow==14.0.2'  &&  python3 -m pip\
+          \ install --quiet --no-warn-script-location 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef batch_inference(\n    project_id: str,\n    processed_bucket:\
+          \ str,\n    model_artefacts_bucket: str,\n    bq_dataset: str,\n    pipeline_run_id:\
+          \ str,\n    model_version: str,\n    # Model artefact inputs\n    lstm_model_input:\
+          \ Input[Artifact],\n    gp_model_input: Input[Artifact],\n    # Outputs\n\
+          \    lstm_inference_output: Output[Artifact],\n    gp_inference_output:\
+          \ Output[Artifact],\n    # Config\n    lstm_lookback: int = 1,\n):\n   \
+          \ \"\"\"\n    Batch inference component.\n\n    Runs batch prediction for\
+          \ both LSTM and GP models on the test set.\n    Loads X_test, y_test, and\
+          \ app_test from processed_bucket \u2014 all\n    produced by the preprocessing\
+          \ component, no index alignment needed.\n\n    Writes predictions + actuals\
+          \ + residuals to BigQuery:\n    - xr_predictions.lstm_predictions\n    -\
+          \ xr_predictions.gp_predictions\n    \"\"\"\n    import io\n    import pickle\n\
+          \    import numpy as np\n    import pandas as pd\n    import torch\n   \
+          \ from google.cloud import storage, bigquery\n    from datetime import datetime,\
+          \ timezone\n\n    gcs_client = storage.Client(project=project_id)\n    bq_client\
+          \ = bigquery.Client(project=project_id)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Helpers\n    # ------------------------------------------------------------------\
+          \ #\n    def download_bytes(bucket_name: str, blob_path: str) -> bytes:\n\
+          \        return gcs_client.bucket(bucket_name).blob(blob_path).download_as_bytes()\n\
+          \n    def load_npy(bucket_name: str, blob_path: str) -> np.ndarray:\n  \
+          \      return np.load(io.BytesIO(download_bytes(bucket_name, blob_path)),\
+          \ allow_pickle=False)\n\n    def load_npy_str(bucket_name: str, blob_path:\
+          \ str) -> np.ndarray:\n        # App arrays contain strings \u2014 allow_pickle\
+          \ required\n        return np.load(io.BytesIO(download_bytes(bucket_name,\
+          \ blob_path)), allow_pickle=True)\n\n    def write_to_bigquery(df: pd.DataFrame,\
+          \ table_id: str):\n        table_ref = f\"{project_id}.{bq_dataset}.{table_id}\"\
+          \n        job_config = bigquery.LoadJobConfig(\n            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,\n\
+          \        )\n        job = bq_client.load_table_from_dataframe(df, table_ref,\
+          \ job_config=job_config)\n        job.result()\n        print(f\"Written\
+          \ {len(df)} rows to {table_ref}\")\n\n    run_timestamp = datetime.now(timezone.utc)\n\
+          \n    # ------------------------------------------------------------------\
+          \ #\n    # Step 1 \u2014 LSTM batch inference\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"=== LSTM Batch Inference ===\")\n\n    X_test_lstm = load_npy(processed_bucket,\
+          \ \"lstm/test/X_test.npy\")\n    y_test_lstm = load_npy(processed_bucket,\
+          \ \"lstm/test/y_test.npy\")\n    app_test_lstm = load_npy_str(processed_bucket,\
+          \ \"lstm/test/app_test.npy\")\n\n    scaler = pickle.loads(download_bytes(model_artefacts_bucket,\
+          \ \"lstm/model/lstm_scaler.pkl\"))\n\n    model_bytes = download_bytes(model_artefacts_bucket,\
+          \ \"lstm/model/model.pt\")\n    lstm_model = torch.jit.load(io.BytesIO(model_bytes))\n\
+          \    lstm_model.eval()\n\n    X_test_t = torch.tensor(X_test_lstm).float()\n\
+          \    with torch.no_grad():\n        preds_scaled = lstm_model(X_test_t).numpy().flatten()\n\
+          \n    def inverse_transform(vals_scaled: np.ndarray, scaler, lookback: int)\
+          \ -> np.ndarray:\n        dummies = np.zeros((len(vals_scaled), lookback\
+          \ + 1))\n        dummies[:, 0] = vals_scaled\n        return scaler.inverse_transform(dummies)[:,\
+          \ 0]\n\n    lstm_preds = inverse_transform(preds_scaled, scaler, lstm_lookback)\n\
+          \    lstm_actuals = inverse_transform(y_test_lstm.flatten(), scaler, lstm_lookback)\n\
+          \    lstm_features = inverse_transform(X_test_lstm.reshape(-1), scaler,\
+          \ lstm_lookback)\n\n    residuals_lstm = lstm_actuals - lstm_preds\n   \
+          \ squared_errors_lstm = residuals_lstm ** 2\n\n    lstm_df = pd.DataFrame({\n\
+          \        \"sample_index\":     np.arange(len(lstm_preds)),\n        \"time_t_minus_1\"\
+          :   lstm_features,\n        \"actual_time_t\":    lstm_actuals,\n      \
+          \  \"predicted_time_t\": lstm_preds,\n        \"residual\":         residuals_lstm,\n\
+          \        \"squared_error\":    squared_errors_lstm,\n        \"app\":  \
+          \            app_test_lstm,\n        \"run_id\":           pipeline_run_id,\n\
+          \        \"run_timestamp\":    pd.to_datetime(run_timestamp, utc=True),\n\
+          \        \"model_version\":    model_version,\n    })\n\n    print(f\"LSTM\
+          \ predictions shape: {lstm_df.shape}\")\n    print(f\"LSTM test RMSE: {np.sqrt(squared_errors_lstm.mean()):.6f}\"\
+          )\n\n    write_to_bigquery(lstm_df, \"lstm_predictions\")\n    lstm_inference_output.uri\
+          \ = f\"gs://{model_artefacts_bucket}/lstm/inference/\"\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 2 \u2014 GP batch inference\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"=== GP Batch Inference ===\")\n\n    X_test_gp = load_npy(processed_bucket,\
+          \ \"gp/test/X_test.npy\")\n    y_test_gp = load_npy(processed_bucket, \"\
+          gp/test/y_test.npy\")\n    app_test_gp = load_npy_str(processed_bucket,\
+          \ \"gp/test/app_test.npy\")\n\n    gp_model = pickle.loads(download_bytes(model_artefacts_bucket,\
+          \ \"gp/model/model.pkl\"))\n\n    gp_preds = gp_model.predict(X_test_gp).flatten()\n\
+          \    gp_actuals = y_test_gp.flatten()\n\n    residuals_gp = gp_actuals -\
+          \ gp_preds\n    squared_errors_gp = residuals_gp ** 2\n\n    gp_df = pd.DataFrame({\n\
+          \        \"sample_index\":     np.arange(len(gp_preds)),\n        \"time_t_minus_1\"\
+          :   X_test_gp.flatten(),\n        \"actual_time_t\":    gp_actuals,\n  \
+          \      \"predicted_time_t\": gp_preds,\n        \"residual\":         residuals_gp,\n\
+          \        \"squared_error\":    squared_errors_gp,\n        \"app\":    \
+          \          app_test_gp,\n        \"run_id\":           pipeline_run_id,\n\
+          \        \"run_timestamp\":    pd.to_datetime(run_timestamp, utc=True),\n\
+          \        \"model_version\":    model_version,\n    })\n\n    print(f\"GP\
+          \ predictions shape: {gp_df.shape}\")\n    print(f\"GP test RMSE: {np.sqrt(squared_errors_gp.mean()):.6f}\"\
+          )\n\n    write_to_bigquery(gp_df, \"gp_predictions\")\n    gp_inference_output.uri\
+          \ = f\"gs://{model_artefacts_bucket}/gp/inference/\"\n\n    print(\"===\
+          \ Batch inference complete ===\")\n\n"
+        image: python:3.10-slim
+    exec-evaluate:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.17.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate(\n    lstm_metrics_input: Input[Metrics],\n    gp_metrics_input:\
+          \ Input[Metrics],\n    combined_metrics: Output[Metrics],\n):\n    \"\"\"\
+          \n    Evaluation component.\n\n    Reads train and test RMSE from both LSTM\
+          \ and GP training components\n    and logs them together in one KFP Metrics\
+          \ output for side-by-side\n    visibility in the Vertex AI Pipelines UI.\n\
+          \n    No gating. No comparison logic. Both models always proceed to upload.\n\
+          \    \"\"\"\n\n    lstm_train_rmse = lstm_metrics_input.metadata.get(\"\
+          train_rmse\")\n    lstm_test_rmse = lstm_metrics_input.metadata.get(\"test_rmse\"\
+          )\n    gp_train_rmse = gp_metrics_input.metadata.get(\"train_rmse\")\n \
+          \   gp_test_rmse = gp_metrics_input.metadata.get(\"test_rmse\")\n\n    combined_metrics.log_metric(\"\
+          lstm_train_rmse\", lstm_train_rmse)\n    combined_metrics.log_metric(\"\
+          lstm_test_rmse\", lstm_test_rmse)\n    combined_metrics.log_metric(\"gp_train_rmse\"\
+          , gp_train_rmse)\n    combined_metrics.log_metric(\"gp_test_rmse\", gp_test_rmse)\n\
+          \n    print(\"=== Model RMSE Comparison ===\")\n    print(f\"LSTM  | Train\
+          \ RMSE: {lstm_train_rmse:.6f} | Test RMSE: {lstm_test_rmse:.6f}\")\n   \
+          \ print(f\"GP    | Train RMSE: {gp_train_rmse:.6f} | Test RMSE: {gp_test_rmse:.6f}\"\
+          )\n    print(\"==============================\")\n\n"
+        image: python:3.10-slim
+    exec-gp-training:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - gp_training
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==1.26.4'\
+          \ 'scikit-learn==1.3.2' 'google-cloud-storage==2.14.0'  &&  python3 -m pip\
+          \ install --quiet --no-warn-script-location 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef gp_training(\n    project_id: str,\n    model_artefacts_bucket:\
+          \ str,\n    # Inputs from preprocessing\n    gp_train_input: Input[Artifact],\n\
+          \    gp_test_input: Input[Artifact],\n    # Outputs\n    gp_model_output:\
+          \ Output[Artifact],\n    gp_metrics: Output[Metrics],\n    # Hyperparameters\n\
+          \    n_restarts_optimizer: int = 10,\n    normalize_y: bool = True,\n):\n\
+          \    \"\"\"\n    GP Regressor training component.\n\n    Replicates PhD\
+          \ GP exactly:\n    - Kernel: WhiteKernel + ConstantKernel * Matern(nu=1.5)\n\
+          \    - n_restarts_optimizer=10\n    - normalize_y=True\n    - alpha=0.0\n\
+          \    - Feature X: Time(t-1), Target y: Time(t)\n    - n=50000 rows, 70/30\
+          \ split (done in preprocessing)\n\n    Saves:\n    - model.pkl \u2192 GCS\
+          \ model-artefacts/gp/model/\n    - Metrics: train R2, test R2, train MAE,\
+          \ test MAE, test RMSE\n    \"\"\"\n    import io\n    import pickle\n  \
+          \  import numpy as np\n    from sklearn.gaussian_process import GaussianProcessRegressor\n\
+          \    from sklearn.gaussian_process.kernels import (\n        WhiteKernel,\n\
+          \        ConstantKernel,\n        Matern,\n    )\n    from sklearn.metrics\
+          \ import mean_absolute_error\n    from google.cloud import storage\n\n \
+          \   gcs_client = storage.Client(project=project_id)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Helpers\n    # ------------------------------------------------------------------\
+          \ #\n    def download_bytes(bucket_name: str, blob_path: str) -> bytes:\n\
+          \        bucket = gcs_client.bucket(bucket_name)\n        return bucket.blob(blob_path).download_as_bytes()\n\
+          \n    def load_npy(bucket_name: str, blob_path: str) -> np.ndarray:\n  \
+          \      data = download_bytes(bucket_name, blob_path)\n        return np.load(io.BytesIO(data),\
+          \ allow_pickle=False)\n\n    def upload_bytes(bucket_name: str, blob_path:\
+          \ str, data: bytes):\n        bucket = gcs_client.bucket(bucket_name)\n\
+          \        bucket.blob(blob_path).upload_from_string(data)\n        print(f\"\
+          Uploaded to gs://{bucket_name}/{blob_path}\")\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 1 \u2014 Load preprocessed arrays from GCS\n    # ------------------------------------------------------------------\
+          \ #\n    train_uri = gp_train_input.uri.replace(\"gs://\", \"\")\n    test_uri\
+          \ = gp_test_input.uri.replace(\"gs://\", \"\")\n\n    train_bucket = train_uri.split(\"\
+          /\")[0]\n    train_prefix = \"/\".join(train_uri.split(\"/\")[1:])\n   \
+          \ test_prefix = \"/\".join(test_uri.split(\"/\")[1:])\n\n    print(\"Loading\
+          \ GP training arrays...\")\n    X_train = load_npy(train_bucket, f\"{train_prefix}/X_train.npy\"\
+          )\n    y_train = load_npy(train_bucket, f\"{train_prefix}/y_train.npy\"\
+          )\n    X_test = load_npy(train_bucket, f\"{test_prefix}/X_test.npy\")\n\
+          \    y_test = load_npy(train_bucket, f\"{test_prefix}/y_test.npy\")\n\n\
+          \    print(f\"X_train: {X_train.shape}, y_train: {y_train.shape}\")\n  \
+          \  print(f\"X_test:  {X_test.shape},  y_test:  {y_test.shape}\")\n\n   \
+          \ # ------------------------------------------------------------------ #\n\
+          \    # Step 2 \u2014 Define kernel (exact PhD configuration)\n    # ------------------------------------------------------------------\
+          \ #\n    k0 = WhiteKernel(\n        noise_level=0.3 ** 2,\n        noise_level_bounds=(0.1\
+          \ ** 2, 0.5 ** 2),\n    )\n    k1 = ConstantKernel(constant_value=2) * Matern(length_scale=1.0,\
+          \ nu=1.5)\n    kernel = k0 + k1\n\n    gp = GaussianProcessRegressor(\n\
+          \        kernel=kernel,\n        n_restarts_optimizer=n_restarts_optimizer,\n\
+          \        normalize_y=normalize_y,\n        alpha=0.0,\n    )\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 3 \u2014 Fit\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"Fitting GP regressor...\")\n    gp.fit(X_train, y_train)\n\
+          \    print(f\"Optimised kernel: {gp.kernel_}\")\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 4 \u2014 Evaluate\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"Evaluating...\")\n\n    train_r2 = float(gp.score(X_train,\
+          \ y_train))\n    test_r2 = float(gp.score(X_test, y_test))\n\n    y_train_pred\
+          \ = gp.predict(X_train)\n    y_test_pred = gp.predict(X_test)\n\n    train_mae\
+          \ = float(mean_absolute_error(y_train, y_train_pred))\n    test_mae = float(mean_absolute_error(y_test,\
+          \ y_test_pred))\n\n    train_rmse = float(np.sqrt(np.mean((y_train.flatten()\
+          \ - y_train_pred.flatten()) ** 2)))\n    test_rmse = float(np.sqrt(np.mean((y_test.flatten()\
+          \ - y_test_pred.flatten()) ** 2)))\n\n    print(f\"Train R2:   {train_r2:.4f}\"\
+          )\n    print(f\"Test  R2:   {test_r2:.4f}\")\n    print(f\"Train MAE:  {train_mae:.6f}\"\
+          )\n    print(f\"Test  MAE:  {test_mae:.6f}\")\n    print(f\"Train RMSE:\
+          \ {train_rmse:.6f}\")\n    print(f\"Test  RMSE: {test_rmse:.6f}\")\n\n \
+          \   # Log metrics to KFP\n    gp_metrics.log_metric(\"train_r2\", train_r2)\n\
+          \    gp_metrics.log_metric(\"test_r2\", test_r2)\n    gp_metrics.log_metric(\"\
+          train_mae\", train_mae)\n    gp_metrics.log_metric(\"test_mae\", test_mae)\n\
+          \    gp_metrics.log_metric(\"train_rmse\", train_rmse)\n    gp_metrics.log_metric(\"\
+          test_rmse\", test_rmse)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 5 \u2014 Save model to GCS\n    # ------------------------------------------------------------------\
+          \ #\n    upload_bytes(\n        model_artefacts_bucket,\n        \"gp/model/model.pkl\"\
+          ,\n        pickle.dumps(gp),\n    )\n\n    gp_model_output.uri = f\"gs://{model_artefacts_bucket}/gp/model/model.pkl\"\
+          \n    print(\"GP model saved to GCS.\")\n\n"
+        image: python:3.10-slim
+        resources:
+          cpuLimit: 8.0
+          cpuRequest: 7.0
+          memoryLimit: 52.0
+          memoryRequest: 40.0
+          resourceCpuLimit: '8'
+          resourceCpuRequest: '7'
+          resourceMemoryLimit: 52G
+          resourceMemoryRequest: 40G
+    exec-lstm-training:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - lstm_training
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'numpy==1.26.4'\
+          \ 'torch==2.1.2' 'scikit-learn==1.3.2' 'google-cloud-storage==2.14.0' 'torch-model-archiver==0.9.0'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.17.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef lstm_training(\n    project_id: str,\n    model_artefacts_bucket:\
+          \ str,\n    # Inputs from preprocessing\n    lstm_train_input: Input[Artifact],\n\
+          \    lstm_test_input: Input[Artifact],\n    lstm_scaler_input: Input[Artifact],\n\
+          \    # Output\n    lstm_model_output: Output[Artifact],\n    lstm_metrics:\
+          \ Output[Metrics],\n    # Hyperparameters\n    input_size: int = 1,\n  \
+          \  hidden_size: int = 200,\n    num_stacked_layers: int = 1,\n    batch_size:\
+          \ int = 128,\n    num_epochs: int = 18,#600,\n    learning_rate: float =\
+          \ 0.004,\n    lookback: int = 1,\n):\n    \"\"\"\n    LSTM training component.\n\
+          \n    Replicates PhD LSTM exactly:\n    - Architecture: LSTM(1, 200, 1)\
+          \ + Linear(200, 1)\n    - Loss: MSELoss\n    - Optimizer: Adam lr=0.004\n\
+          \    - Epochs: 600\n    - Input: scaled Time(t-1), Target: scaled Time(t)\n\
+          \n    Saves:\n    - model.mar (TorchServe archive bundling model.pt + lstm_scaler.pkl\
+          \ + handler.py)\n      \u2192 GCS model-artefacts/lstm/model/\n    - train\
+          \ RMSE and val RMSE logged to KFP Metrics\n    \"\"\"\n    import io\n \
+          \   import os\n    import pickle\n    import subprocess\n    import tempfile\n\
+          \    import numpy as np\n    import torch\n    import torch.nn as nn\n \
+          \   from torch.utils.data import Dataset, DataLoader\n    from google.cloud\
+          \ import storage\n\n    gcs_client = storage.Client(project=project_id)\n\
+          \n    # ------------------------------------------------------------------\
+          \ #\n    # Helpers\n    # ------------------------------------------------------------------\
+          \ #\n    def download_bytes(bucket_name: str, blob_path: str) -> bytes:\n\
+          \        return gcs_client.bucket(bucket_name).blob(blob_path).download_as_bytes()\n\
+          \n    def load_npy(bucket_name: str, blob_path: str) -> np.ndarray:\n  \
+          \      return np.load(io.BytesIO(download_bytes(bucket_name, blob_path)),\
+          \ allow_pickle=False)\n\n    def upload_bytes(bucket_name: str, blob_path:\
+          \ str, data: bytes):\n        gcs_client.bucket(bucket_name).blob(blob_path).upload_from_string(data)\n\
+          \        print(f\"Uploaded to gs://{bucket_name}/{blob_path}\")\n\n    def\
+          \ upload_file(bucket_name: str, blob_path: str, local_path: str):\n    \
+          \    gcs_client.bucket(bucket_name).blob(blob_path).upload_from_filename(local_path)\n\
+          \        print(f\"Uploaded to gs://{bucket_name}/{blob_path}\")\n\n    #\
+          \ ------------------------------------------------------------------ #\n\
+          \    # Step 1 \u2014 Load preprocessed arrays from GCS\n    # ------------------------------------------------------------------\
+          \ #\n    train_uri = lstm_train_input.uri.replace(\"gs://\", \"\")\n   \
+          \ test_uri = lstm_test_input.uri.replace(\"gs://\", \"\")\n\n    train_bucket\
+          \ = train_uri.split(\"/\")[0]\n    train_prefix = \"/\".join(train_uri.split(\"\
+          /\")[1:])\n    test_prefix = \"/\".join(test_uri.split(\"/\")[1:])\n\n \
+          \   print(\"Loading LSTM training arrays...\")\n    X_train = load_npy(train_bucket,\
+          \ f\"{train_prefix}/X_train.npy\")\n    y_train = load_npy(train_bucket,\
+          \ f\"{train_prefix}/y_train.npy\")\n    X_test = load_npy(train_bucket,\
+          \ f\"{test_prefix}/X_test.npy\")\n    y_test = load_npy(train_bucket, f\"\
+          {test_prefix}/y_test.npy\")\n\n    print(f\"X_train: {X_train.shape}, y_train:\
+          \ {y_train.shape}\")\n    print(f\"X_test:  {X_test.shape},  y_test:  {y_test.shape}\"\
+          )\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 2 \u2014 Tensors and DataLoaders\n    # ------------------------------------------------------------------\
+          \ #\n    device = \"cuda:0\" if torch.cuda.is_available() else \"cpu\"\n\
+          \    print(f\"Device: {device}\")\n\n    X_train_t = torch.tensor(X_train).float()\n\
+          \    y_train_t = torch.tensor(y_train).float()\n    X_test_t = torch.tensor(X_test).float()\n\
+          \    y_test_t = torch.tensor(y_test).float()\n\n    class TimeSeriesDataset(Dataset):\n\
+          \        def __init__(self, X, y):\n            self.X = X\n           \
+          \ self.y = y\n\n        def __len__(self):\n            return len(self.X)\n\
+          \n        def __getitem__(self, idx):\n            return self.X[idx], self.y[idx]\n\
+          \n    train_loader = DataLoader(\n        TimeSeriesDataset(X_train_t, y_train_t),\n\
+          \        batch_size=batch_size,\n        shuffle=True,\n    )\n    test_loader\
+          \ = DataLoader(\n        TimeSeriesDataset(X_test_t, y_test_t),\n      \
+          \  batch_size=batch_size,\n        shuffle=False,\n    )\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 3 \u2014 Model definition (exact PhD architecture)\n   \
+          \ # ------------------------------------------------------------------ #\n\
+          \    class LSTMModel(nn.Module):\n        def __init__(self, input_size,\
+          \ hidden_size, num_stacked_layers):\n            super().__init__()\n  \
+          \          self.hidden_size = hidden_size\n            self.num_stacked_layers\
+          \ = num_stacked_layers\n            self.lstm = nn.LSTM(\n             \
+          \   input_size, hidden_size, num_stacked_layers, batch_first=True\n    \
+          \        )\n            self.fc = nn.Linear(hidden_size, 1)\n\n        def\
+          \ forward(self, x):\n            batch_size = x.size(0)\n            h0\
+          \ = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(device)\n\
+          \            c0 = torch.zeros(self.num_stacked_layers, batch_size, self.hidden_size).to(device)\n\
+          \            out, _ = self.lstm(x, (h0, c0))\n            out = self.fc(out[:,\
+          \ -1, :])\n            return out\n\n    model = LSTMModel(input_size, hidden_size,\
+          \ num_stacked_layers).to(device)\n    loss_fn = nn.MSELoss()\n    optimiser\
+          \ = torch.optim.Adam(model.parameters(), lr=learning_rate)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 4 \u2014 Training loop\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"Starting training...\")\n    best_val_loss = float(\"inf\"\
+          )\n    best_model_state = None\n\n    for epoch in range(num_epochs):\n\
+          \        model.train()\n        train_loss = 0.0\n        for x_batch, y_batch\
+          \ in train_loader:\n            x_batch, y_batch = x_batch.to(device), y_batch.to(device)\n\
+          \            output = model(x_batch)\n            loss = loss_fn(output,\
+          \ y_batch)\n            optimiser.zero_grad()\n            loss.backward()\n\
+          \            optimiser.step()\n            train_loss += loss.item()\n\n\
+          \        model.eval()\n        val_loss = 0.0\n        with torch.no_grad():\n\
+          \            for x_batch, y_batch in test_loader:\n                x_batch,\
+          \ y_batch = x_batch.to(device), y_batch.to(device)\n                output\
+          \ = model(x_batch)\n                val_loss += loss_fn(output, y_batch).item()\n\
+          \n        avg_train_loss = train_loss / len(train_loader)\n        avg_val_loss\
+          \ = val_loss / len(test_loader)\n\n        if (epoch + 1) % 50 == 0:\n \
+          \           print(f\"Epoch {epoch+1}/{num_epochs} | Train Loss: {avg_train_loss:.6f}\
+          \ | Val Loss: {avg_val_loss:.6f}\")\n\n        if avg_val_loss < best_val_loss:\n\
+          \            best_val_loss = avg_val_loss\n            best_model_state\
+          \ = {k: v.clone() for k, v in model.state_dict().items()}\n\n    print(\"\
+          Training complete.\")\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 5 \u2014 Compute RMSE on unscaled predictions\n    # ------------------------------------------------------------------\
+          \ #\n    scaler_bucket = lstm_scaler_input.uri.replace(\"gs://\", \"\").split(\"\
+          /\")[0]\n    scaler_blob = \"/\".join(lstm_scaler_input.uri.replace(\"gs://\"\
+          , \"\").split(\"/\")[1:])\n    scaler = pickle.loads(download_bytes(scaler_bucket,\
+          \ scaler_blob))\n\n    model.load_state_dict(best_model_state)\n    model.eval()\n\
+          \    model.to(device)\n\n    with torch.no_grad():\n        train_preds_scaled\
+          \ = model(X_train_t.to(device)).cpu().numpy().flatten()\n        test_preds_scaled\
+          \ = model(X_test_t.to(device)).cpu().numpy().flatten()\n\n    def inverse_transform_preds(preds_scaled,\
+          \ actuals_scaled, scaler, lookback):\n        dummies = np.zeros((len(preds_scaled),\
+          \ lookback + 1))\n        dummies[:, 0] = preds_scaled\n        preds_unscaled\
+          \ = scaler.inverse_transform(dummies)[:, 0]\n        dummies[:, 0] = actuals_scaled.flatten()\n\
+          \        actuals_unscaled = scaler.inverse_transform(dummies)[:, 0]\n  \
+          \      return preds_unscaled, actuals_unscaled\n\n    train_preds, train_actuals\
+          \ = inverse_transform_preds(train_preds_scaled, y_train, scaler, lookback)\n\
+          \    test_preds, test_actuals = inverse_transform_preds(test_preds_scaled,\
+          \ y_test, scaler, lookback)\n\n    train_rmse = float(np.sqrt(np.mean((train_actuals\
+          \ - train_preds) ** 2)))\n    test_rmse = float(np.sqrt(np.mean((test_actuals\
+          \ - test_preds) ** 2)))\n\n    print(f\"Train RMSE: {train_rmse:.6f}\")\n\
+          \    print(f\"Test  RMSE: {test_rmse:.6f}\")\n\n    lstm_metrics.log_metric(\"\
+          train_rmse\", train_rmse)\n    lstm_metrics.log_metric(\"test_rmse\", test_rmse)\n\
+          \    lstm_metrics.log_metric(\"best_val_loss\", best_val_loss)\n    lstm_metrics.log_metric(\"\
+          epochs\", num_epochs)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 6 \u2014 Export as TorchScript + package as model.mar\n\
+          \    # ------------------------------------------------------------------\
+          \ #\n    model.load_state_dict(best_model_state)\n    model.eval()\n   \
+          \ model.to(\"cpu\")\n\n    with tempfile.TemporaryDirectory() as tmpdir:\n\
+          \n        # 6a \u2014 Save TorchScript model\n        model_pt_path = os.path.join(tmpdir,\
+          \ \"model.pt\")\n        example_input = torch.zeros(1, lookback, 1)\n \
+          \       scripted_model = torch.jit.trace(model, example_input)\n       \
+          \ torch.jit.save(scripted_model, model_pt_path)\n        print(\"TorchScript\
+          \ model saved.\")\n\n        # 6b \u2014 Save scaler as extra file\n   \
+          \     scaler_path = os.path.join(tmpdir, \"lstm_scaler.pkl\")\n        with\
+          \ open(scaler_path, \"wb\") as f:\n            pickle.dump(scaler, f)\n\
+          \        print(\"Scaler saved.\")\n\n        # 6c \u2014 Write TorchServe\
+          \ handler\n        handler_path = os.path.join(tmpdir, \"handler.py\")\n\
+          \        handler_code = '''\nimport io\nimport os\nimport pickle\nimport\
+          \ numpy as np\nimport torch\nfrom ts.torch_handler.base_handler import BaseHandler\n\
+          \nclass LSTMHandler(BaseHandler):\n    \"\"\"\n    TorchServe handler for\
+          \ LSTM arrival time prediction.\n    Expects input: {\"instances\": [[time_t_minus_1_value]]}\n\
+          \    Returns: {\"predictions\": [predicted_time_t]}\n    \"\"\"\n\n    def\
+          \ initialize(self, context):\n        super().initialize(context)\n    \
+          \    # Load scaler from model archive extra files\n        model_dir = context.system_properties.get(\"\
+          model_dir\")\n        scaler_path = os.path.join(model_dir, \"lstm_scaler.pkl\"\
+          )\n        with open(scaler_path, \"rb\") as f:\n            self.scaler\
+          \ = pickle.load(f)\n        self.lookback = 1\n        self.initialized\
+          \ = True\n\n    def preprocess(self, data):\n        \"\"\"Scale input using\
+          \ fitted scaler.\"\"\"\n        instances = data[0].get(\"body\", {}).get(\"\
+          instances\", [])\n        inputs = np.array(instances, dtype=np.float32)\
+          \  # shape (n, 1)\n        # Reconstruct combined array for scaler: [y_placeholder,\
+          \ X]\n        combined = np.hstack([np.zeros((len(inputs), 1)), inputs])\n\
+          \        scaled = self.scaler.transform(combined)\n        X_scaled = scaled[:,\
+          \ 1:].reshape(-1, self.lookback, 1)\n        return torch.tensor(X_scaled).float()\n\
+          \n    def inference(self, inputs):\n        with torch.no_grad():\n    \
+          \        return self.model(inputs)\n\n    def postprocess(self, outputs):\n\
+          \        \"\"\"Inverse transform predictions back to original scale.\"\"\
+          \"\n        preds_scaled = outputs.numpy().flatten()\n        dummies =\
+          \ np.zeros((len(preds_scaled), self.lookback + 1))\n        dummies[:, 0]\
+          \ = preds_scaled\n        preds_unscaled = self.scaler.inverse_transform(dummies)[:,\
+          \ 0]\n        return [{\"predictions\": preds_unscaled.tolist()}]\n'''\n\
+          \        with open(handler_path, \"w\") as f:\n            f.write(handler_code)\n\
+          \        print(\"Handler written.\")\n\n        # 6d \u2014 Run torch-model-archiver\n\
+          \        mar_output_dir = os.path.join(tmpdir, \"mar_output\")\n       \
+          \ os.makedirs(mar_output_dir, exist_ok=True)\n\n        cmd = [\n      \
+          \      \"torch-model-archiver\",\n            \"--model-name\", \"lstm_arrival_time\"\
+          ,\n            \"--version\", \"1.0\",\n            \"--serialized-file\"\
+          , model_pt_path,\n            \"--handler\", handler_path,\n           \
+          \ \"--extra-files\", scaler_path,\n            \"--export-path\", mar_output_dir,\n\
+          \            \"--f\",\n        ]\n        result = subprocess.run(cmd, capture_output=True,\
+          \ text=True)\n        if result.returncode != 0:\n            raise RuntimeError(f\"\
+          torch-model-archiver failed:\\n{result.stderr}\")\n        print(\"model.mar\
+          \ created.\")\n\n        # 6e \u2014 Upload model.mar to GCS (for online\
+          \ serving via Vertex AI endpoint)\n        mar_path = os.path.join(mar_output_dir,\
+          \ \"lstm_arrival_time.mar\")\n        # Rename to model.mar for Vertex AI\
+          \ PyTorch container\n        model_mar_path = os.path.join(mar_output_dir,\
+          \ \"model.mar\")\n        os.rename(mar_path, model_mar_path)\n        upload_file(model_artefacts_bucket,\
+          \ \"lstm/model/model.mar\", model_mar_path)\n\n        # 6f \u2014 Upload\
+          \ model.pt and lstm_scaler.pkl separately for batch inference\n        #\
+          \ batch_inference.py loads these directly from GCS \u2014 it does not unpack\
+          \ the .mar\n        upload_file(model_artefacts_bucket, \"lstm/model/model.pt\"\
+          , model_pt_path)\n        upload_file(model_artefacts_bucket, \"lstm/model/lstm_scaler.pkl\"\
+          , scaler_path)\n\n    lstm_model_output.uri = f\"gs://{model_artefacts_bucket}/lstm/model/\"\
+          \n    print(\"LSTM model.mar, model.pt and lstm_scaler.pkl uploaded to GCS.\"\
+          )\n\n"
+        image: python:3.10-slim
+    exec-model-upload:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - model_upload
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform==1.38.1'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.17.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef model_upload(\n    project_id: str,\n    region: str,\n    model_artefacts_bucket:\
+          \ str,\n    pipeline_run_id: str,\n    # Model artefact inputs\n    lstm_model_input:\
+          \ Input[Artifact],\n    gp_model_input: Input[Artifact],\n):\n    \"\"\"\
+          \n    Model upload component.\n\n    Registers both LSTM and GP models in\
+          \ Vertex AI Model Registry.\n    No serving container specified at registration\
+          \ time \u2014 container is\n    assigned at deployment time when models\
+          \ are deployed to endpoints.\n\n    Both models tagged with pipeline_run_id\
+          \ for traceability.\n    No gating \u2014 both models always uploaded.\n\
+          \    \"\"\"\n    from google.cloud import aiplatform\n\n    aiplatform.init(project=project_id,\
+          \ location=region)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # LSTM \u2014 register model artifact only\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"Registering LSTM model in Vertex AI Model Registry...\"\
+          )\n\n    lstm_model = aiplatform.Model.upload(\n        display_name=\"\
+          lstm-arrival-time\",\n        artifact_uri=f\"gs://{model_artefacts_bucket}/lstm/model/\"\
+          ,\n        serving_container_image_uri=\"us-docker.pkg.dev/vertex-ai/prediction/pytorch-cpu.1-13:latest\"\
+          ,\n        labels={\n            \"model_type\": \"lstm\",\n           \
+          \ \"pipeline_run_id\": pipeline_run_id,\n            \"target\": \"arrival_time\"\
+          ,\n        },\n    )\n\n    print(f\"LSTM model registered: {lstm_model.resource_name}\"\
+          )\n\n    # ------------------------------------------------------------------\
+          \ #\n    # GP \u2014 register model artifact only\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"Registering GP model in Vertex AI Model Registry...\")\n\
+          \n    gp_model = aiplatform.Model.upload(\n        display_name=\"gp-arrival-time\"\
+          ,\n        artifact_uri=f\"gs://{model_artefacts_bucket}/gp/model/\",\n\
+          \        serving_container_image_uri=\"us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest\"\
+          ,\n        labels={\n            \"model_type\": \"gaussian_process\",\n\
+          \            \"pipeline_run_id\": pipeline_run_id,\n            \"target\"\
+          : \"arrival_time\",\n        },\n    )\n\n    print(f\"GP model registered:\
+          \ {gp_model.resource_name}\")\n    print(\"Both models registered in Vertex\
+          \ AI Model Registry.\")\n\n"
+        image: python:3.10-slim
+    exec-preprocessing:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocessing
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas==2.1.4'\
+          \ 'numpy==1.26.4' 'scikit-learn==1.3.2' 'google-cloud-storage==2.14.0' \
+          \ &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.17.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocessing(\n    project_id: str,\n    raw_data_bucket: str,\n\
+          \    train_gcs_path: str,\n    test_gcs_path: str,\n    processed_bucket:\
+          \ str,\n    # LSTM outputs\n    lstm_train_output: Output[Artifact],\n \
+          \   lstm_test_output: Output[Artifact],\n    lstm_scaler_output: Output[Artifact],\n\
+          \    # GP outputs\n    gp_train_output: Output[Artifact],\n    gp_test_output:\
+          \ Output[Artifact],\n    # Config\n    lstm_lookback: int = 1,\n    gp_n_samples:\
+          \ int = 5000,#50000,\n    gp_train_prop: float = 0.7,\n):\n    \"\"\"\n\
+          \    Preprocessing component for LSTM and GP branches.\n\n    Shared:\n\
+          \    - Reads train and test CSVs from GCS\n    - Drops Unnamed: 0\n    -\
+          \ Selects Time and App columns\n\n    App is stored as a separate array\
+          \ alongside X and y in GCS.\n    Training components (lstm_training, gp_training)\
+          \ only use X and y.\n    App is used in batch_inference to annotate BigQuery\
+          \ rows.\n\n    LSTM branch:\n    - Builds sliding window dataset (lookback=1)\n\
+          \    - Feature: Time(t-1), Target: Time(t)\n    - Fits MinMaxScaler(-1,1)\
+          \ on train only, applies to both\n    - Saves X_train, y_train, app_train,\
+          \ X_test, y_test, app_test, scaler to GCS\n\n    GP branch:\n    - Subsets\
+          \ to n=50000 rows from train CSV\n    - Feature X: Time(t-1), Target y:\
+          \ Time(t)\n    - 70/30 internal split\n    - Saves X_train, y_train, app_train,\
+          \ X_test, y_test, app_test to GCS\n    \"\"\"\n    import io\n    import\
+          \ pickle\n    import numpy as np\n    import pandas as pd\n    from copy\
+          \ import deepcopy as dc\n    from sklearn.preprocessing import MinMaxScaler\n\
+          \    from google.cloud import storage\n\n    gcs_client = storage.Client(project=project_id)\n\
+          \n    # ------------------------------------------------------------------\
+          \ #\n    # Helpers\n    # ------------------------------------------------------------------\
+          \ #\n    def read_csv_from_gcs(bucket_name: str, blob_path: str) -> pd.DataFrame:\n\
+          \        bucket = gcs_client.bucket(bucket_name)\n        blob = bucket.blob(blob_path)\n\
+          \        content = blob.download_as_bytes()\n        return pd.read_csv(io.BytesIO(content))\n\
+          \n    def upload_bytes_to_gcs(bucket_name: str, blob_path: str, data: bytes):\n\
+          \        bucket = gcs_client.bucket(bucket_name)\n        blob = bucket.blob(blob_path)\n\
+          \        blob.upload_from_string(data)\n        print(f\"Uploaded to gs://{bucket_name}/{blob_path}\"\
+          )\n\n    def upload_pickle_to_gcs(bucket_name: str, blob_path: str, obj):\n\
+          \        upload_bytes_to_gcs(bucket_name, blob_path, pickle.dumps(obj))\n\
+          \n    def upload_numpy_to_gcs(bucket_name: str, blob_path: str, arr: np.ndarray):\n\
+          \        buf = io.BytesIO()\n        np.save(buf, arr)\n        upload_bytes_to_gcs(bucket_name,\
+          \ blob_path, buf.getvalue())\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 1 \u2014 Read raw CSVs from GCS\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"Reading train CSV from GCS...\")\n    train_df = read_csv_from_gcs(raw_data_bucket,\
+          \ train_gcs_path)\n    print(f\"Train shape: {train_df.shape}\")\n\n   \
+          \ print(\"Reading test CSV from GCS...\")\n    test_df = read_csv_from_gcs(raw_data_bucket,\
+          \ test_gcs_path)\n    print(f\"Test shape: {test_df.shape}\")\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 2 \u2014 Shared cleaning: keep Time and App\n    # ------------------------------------------------------------------\
+          \ #\n    def clean(df: pd.DataFrame) -> pd.DataFrame:\n        if \"Unnamed:\
+          \ 0\" in df.columns:\n            df.drop(\"Unnamed: 0\", axis=1, inplace=True)\n\
+          \        df = df[[\"Time\", \"App\"]].copy()\n        assert df[\"Time\"\
+          ].isnull().sum() == 0, \"Nulls found in Time column\"\n        print(f\"\
+          Clean shape: {df.shape}\")\n        return df\n\n    train_df = clean(train_df)\n\
+          \    test_df = clean(test_df)\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 3 \u2014 LSTM branch\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"=== LSTM Preprocessing ===\")\n\n    def build_lstm_dataset(df:\
+          \ pd.DataFrame, lookback: int):\n        data = dc(df)\n        for i in\
+          \ range(1, lookback + 1):\n            data[f\"Time(t-{i})\"] = data[\"\
+          Time\"].shift(i)\n        data.dropna(inplace=True)\n\n        app = data[\"\
+          App\"].values                # keep App separate\n        arr = data.drop(\"\
+          App\", axis=1).to_numpy()\n        y = arr[:, 0]                       \
+          \    # Time(t) \u2014 target\n        X = arr[:, 1:]                   \
+          \       # Time(t-1) \u2014 feature\n        X = np.flip(X, axis=1)     \
+          \             # mirror as per PhD code\n        return X, y, app\n\n   \
+          \ X_train_lstm, y_train_lstm, app_train_lstm = build_lstm_dataset(train_df,\
+          \ lstm_lookback)\n    X_test_lstm, y_test_lstm, app_test_lstm = build_lstm_dataset(test_df,\
+          \ lstm_lookback)\n\n    print(f\"LSTM train X: {X_train_lstm.shape}, y:\
+          \ {y_train_lstm.shape}, app: {app_train_lstm.shape}\")\n    print(f\"LSTM\
+          \ test  X: {X_test_lstm.shape}, y: {y_test_lstm.shape}, app: {app_test_lstm.shape}\"\
+          )\n\n    # Fit scaler on train only \u2014 stack X and y as per PhD approach\n\
+          \    train_combined = np.hstack([y_train_lstm.reshape(-1, 1), X_train_lstm])\n\
+          \    test_combined = np.hstack([y_test_lstm.reshape(-1, 1), X_test_lstm])\n\
+          \n    scaler = MinMaxScaler(feature_range=(-1, 1))\n    train_scaled = scaler.fit_transform(train_combined)\n\
+          \    test_scaled = scaler.transform(test_combined)\n\n    X_train_lstm_scaled\
+          \ = train_scaled[:, 1:].reshape(-1, lstm_lookback, 1)\n    y_train_lstm_scaled\
+          \ = train_scaled[:, 0].reshape(-1, 1)\n    X_test_lstm_scaled = test_scaled[:,\
+          \ 1:].reshape(-1, lstm_lookback, 1)\n    y_test_lstm_scaled = test_scaled[:,\
+          \ 0].reshape(-1, 1)\n\n    print(f\"LSTM train scaled X: {X_train_lstm_scaled.shape},\
+          \ y: {y_train_lstm_scaled.shape}\")\n\n    # Upload LSTM artefacts \u2014\
+          \ X, y, app stored separately\n    upload_pickle_to_gcs(processed_bucket,\
+          \ \"lstm/scaler/lstm_scaler.pkl\", scaler)\n    upload_numpy_to_gcs(processed_bucket,\
+          \ \"lstm/train/X_train.npy\", X_train_lstm_scaled)\n    upload_numpy_to_gcs(processed_bucket,\
+          \ \"lstm/train/y_train.npy\", y_train_lstm_scaled)\n    upload_numpy_to_gcs(processed_bucket,\
+          \ \"lstm/train/app_train.npy\", app_train_lstm)\n    upload_numpy_to_gcs(processed_bucket,\
+          \ \"lstm/test/X_test.npy\", X_test_lstm_scaled)\n    upload_numpy_to_gcs(processed_bucket,\
+          \ \"lstm/test/y_test.npy\", y_test_lstm_scaled)\n    upload_numpy_to_gcs(processed_bucket,\
+          \ \"lstm/test/app_test.npy\", app_test_lstm)\n\n    lstm_train_output.uri\
+          \ = f\"gs://{processed_bucket}/lstm/train\"\n    lstm_test_output.uri =\
+          \ f\"gs://{processed_bucket}/lstm/test\"\n    lstm_scaler_output.uri = f\"\
+          gs://{processed_bucket}/lstm/scaler/lstm_scaler.pkl\"\n\n    print(\"LSTM\
+          \ preprocessing complete.\")\n\n    # ------------------------------------------------------------------\
+          \ #\n    # Step 4 \u2014 GP branch\n    # ------------------------------------------------------------------\
+          \ #\n    print(\"=== GP Preprocessing ===\")\n\n    gp_df = train_df.iloc[:gp_n_samples].copy()\n\
+          \    gp_df[\"Time_prev\"] = gp_df[\"Time\"].shift(1)\n    gp_df.dropna(inplace=True)\n\
+          \n    X_gp = gp_df[\"Time_prev\"].values.reshape(-1, 1)\n    y_gp = gp_df[\"\
+          Time\"].values.reshape(-1, 1)\n    app_gp = gp_df[\"App\"].values\n\n  \
+          \  n_train_gp = round(gp_train_prop * len(X_gp))\n    X_train_gp = X_gp[:n_train_gp]\n\
+          \    y_train_gp = y_gp[:n_train_gp]\n    app_train_gp = app_gp[:n_train_gp]\n\
+          \    X_test_gp = X_gp[n_train_gp:]\n    y_test_gp = y_gp[n_train_gp:]\n\
+          \    app_test_gp = app_gp[n_train_gp:]\n\n    print(f\"GP train X: {X_train_gp.shape},\
+          \ y: {y_train_gp.shape}, app: {app_train_gp.shape}\")\n    print(f\"GP test\
+          \  X: {X_test_gp.shape}, y: {y_test_gp.shape}, app: {app_test_gp.shape}\"\
+          )\n\n    upload_numpy_to_gcs(processed_bucket, \"gp/train/X_train.npy\"\
+          , X_train_gp)\n    upload_numpy_to_gcs(processed_bucket, \"gp/train/y_train.npy\"\
+          , y_train_gp)\n    upload_numpy_to_gcs(processed_bucket, \"gp/train/app_train.npy\"\
+          , app_train_gp)\n    upload_numpy_to_gcs(processed_bucket, \"gp/test/X_test.npy\"\
+          , X_test_gp)\n    upload_numpy_to_gcs(processed_bucket, \"gp/test/y_test.npy\"\
+          , y_test_gp)\n    upload_numpy_to_gcs(processed_bucket, \"gp/test/app_test.npy\"\
+          , app_test_gp)\n\n    gp_train_output.uri = f\"gs://{processed_bucket}/gp/train\"\
+          \n    gp_test_output.uri = f\"gs://{processed_bucket}/gp/test\"\n\n    print(\"\
+          GP preprocessing complete.\")\n    print(\"=== Preprocessing done ===\"\
+          )\n\n"
+        image: python:3.10-slim
+pipelineInfo:
+  description: Full MLOps pipeline for XR network traffic arrival time prediction.
+    Trains LSTM and GP Regressor models in parallel, evaluates RMSE, registers both
+    models in Vertex AI Model Registry, runs batch inference, and writes predictions
+    to BigQuery.
+  name: xr-traffic-mlops-pipeline
+root:
+  dag:
+    tasks:
+      batch-inference:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-batch-inference
+        dependentTasks:
+        - gp-training
+        - lstm-training
+        - model-upload
+        inputs:
+          artifacts:
+            gp_model_input:
+              taskOutputArtifact:
+                outputArtifactKey: gp_model_output
+                producerTask: gp-training
+            lstm_model_input:
+              taskOutputArtifact:
+                outputArtifactKey: lstm_model_output
+                producerTask: lstm-training
+          parameters:
+            bq_dataset:
+              componentInputParameter: bq_dataset
+            lstm_lookback:
+              componentInputParameter: lstm_lookback
+            model_artefacts_bucket:
+              componentInputParameter: model_artefacts_bucket
+            model_version:
+              componentInputParameter: model_version
+            pipeline_run_id:
+              componentInputParameter: pipeline_run_id
+            processed_bucket:
+              componentInputParameter: processed_bucket
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: batch-inference
+      evaluate:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate
+        dependentTasks:
+        - gp-training
+        - lstm-training
+        inputs:
+          artifacts:
+            gp_metrics_input:
+              taskOutputArtifact:
+                outputArtifactKey: gp_metrics
+                producerTask: gp-training
+            lstm_metrics_input:
+              taskOutputArtifact:
+                outputArtifactKey: lstm_metrics
+                producerTask: lstm-training
+        taskInfo:
+          name: evaluate
+      gp-training:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-gp-training
+        dependentTasks:
+        - preprocessing
+        inputs:
+          artifacts:
+            gp_test_input:
+              taskOutputArtifact:
+                outputArtifactKey: gp_test_output
+                producerTask: preprocessing
+            gp_train_input:
+              taskOutputArtifact:
+                outputArtifactKey: gp_train_output
+                producerTask: preprocessing
+          parameters:
+            model_artefacts_bucket:
+              componentInputParameter: model_artefacts_bucket
+            n_restarts_optimizer:
+              componentInputParameter: gp_n_restarts_optimizer
+            normalize_y:
+              componentInputParameter: gp_normalize_y
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: gp-training
+      lstm-training:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-lstm-training
+        dependentTasks:
+        - preprocessing
+        inputs:
+          artifacts:
+            lstm_scaler_input:
+              taskOutputArtifact:
+                outputArtifactKey: lstm_scaler_output
+                producerTask: preprocessing
+            lstm_test_input:
+              taskOutputArtifact:
+                outputArtifactKey: lstm_test_output
+                producerTask: preprocessing
+            lstm_train_input:
+              taskOutputArtifact:
+                outputArtifactKey: lstm_train_output
+                producerTask: preprocessing
+          parameters:
+            batch_size:
+              componentInputParameter: lstm_batch_size
+            hidden_size:
+              componentInputParameter: lstm_hidden_size
+            input_size:
+              componentInputParameter: lstm_input_size
+            learning_rate:
+              componentInputParameter: lstm_learning_rate
+            lookback:
+              componentInputParameter: lstm_lookback
+            model_artefacts_bucket:
+              componentInputParameter: model_artefacts_bucket
+            num_epochs:
+              componentInputParameter: lstm_num_epochs
+            num_stacked_layers:
+              componentInputParameter: lstm_num_stacked_layers
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: lstm-training
+      model-upload:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-model-upload
+        dependentTasks:
+        - evaluate
+        - gp-training
+        - lstm-training
+        inputs:
+          artifacts:
+            gp_model_input:
+              taskOutputArtifact:
+                outputArtifactKey: gp_model_output
+                producerTask: gp-training
+            lstm_model_input:
+              taskOutputArtifact:
+                outputArtifactKey: lstm_model_output
+                producerTask: lstm-training
+          parameters:
+            model_artefacts_bucket:
+              componentInputParameter: model_artefacts_bucket
+            pipeline_run_id:
+              componentInputParameter: pipeline_run_id
+            project_id:
+              componentInputParameter: project_id
+            region:
+              componentInputParameter: region
+        taskInfo:
+          name: model-upload
+      preprocessing:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocessing
+        inputs:
+          parameters:
+            gp_n_samples:
+              componentInputParameter: gp_n_samples
+            gp_train_prop:
+              componentInputParameter: gp_train_prop
+            lstm_lookback:
+              componentInputParameter: lstm_lookback
+            processed_bucket:
+              componentInputParameter: processed_bucket
+            project_id:
+              componentInputParameter: project_id
+            raw_data_bucket:
+              componentInputParameter: raw_data_bucket
+            test_gcs_path:
+              componentInputParameter: test_gcs_path
+            train_gcs_path:
+              componentInputParameter: train_gcs_path
+        taskInfo:
+          name: preprocessing
+  inputDefinitions:
+    parameters:
+      bq_dataset:
+        defaultValue: xr_predictions
+        isOptional: true
+        parameterType: STRING
+      gp_n_restarts_optimizer:
+        defaultValue: 10.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      gp_n_samples:
+        defaultValue: 1000.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      gp_normalize_y:
+        defaultValue: true
+        isOptional: true
+        parameterType: BOOLEAN
+      gp_train_prop:
+        defaultValue: 0.7
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      lstm_batch_size:
+        defaultValue: 128.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lstm_hidden_size:
+        defaultValue: 200.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lstm_input_size:
+        defaultValue: 1.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lstm_learning_rate:
+        defaultValue: 0.004
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      lstm_lookback:
+        defaultValue: 1.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lstm_num_epochs:
+        defaultValue: 18.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      lstm_num_stacked_layers:
+        defaultValue: 1.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      model_artefacts_bucket:
+        parameterType: STRING
+      model_version:
+        defaultValue: v1
+        isOptional: true
+        parameterType: STRING
+      pipeline_root_bucket:
+        parameterType: STRING
+      pipeline_run_id:
+        defaultValue: run-001
+        isOptional: true
+        parameterType: STRING
+      processed_bucket:
+        parameterType: STRING
+      project_id:
+        parameterType: STRING
+      raw_data_bucket:
+        parameterType: STRING
+      region:
+        parameterType: STRING
+      test_gcs_path:
+        defaultValue: xr-traffic/concatenated_df_DN_test.csv
+        isOptional: true
+        parameterType: STRING
+      train_gcs_path:
+        defaultValue: xr-traffic/concatenated_df_DN_train.csv
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.17.0
