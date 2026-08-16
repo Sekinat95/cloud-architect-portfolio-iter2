@@ -8,6 +8,7 @@ from kfp.dsl import component, Output, Artifact
         "numpy==1.26.4",
         "scikit-learn==1.3.2",
         "google-cloud-storage==2.14.0",
+        "google-cloud-bigquery==3.14.1",
     ],
 )
 # def preprocessing(
