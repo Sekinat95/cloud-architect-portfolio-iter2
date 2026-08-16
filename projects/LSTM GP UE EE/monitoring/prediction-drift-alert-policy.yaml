@@ -1,0 +1,14 @@
+displayName: "Prediction Drift Alert"
+conditions:
+  - displayName: "Prediction drift detected"
+    conditionThreshold:
+      filter: 'resource.type="aiplatform.googleapis.com/PipelineJob" AND metric.type="logging.googleapis.com/user/prediction_drift"'
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 0s
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_COUNT
+combiner: OR
+notificationChannels:
+  - projects/lstm-gp-xr-ue-ee/notificationChannels/9403934653225783109

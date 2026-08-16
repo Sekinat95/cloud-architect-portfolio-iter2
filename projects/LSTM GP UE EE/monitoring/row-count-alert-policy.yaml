@@ -1,0 +1,14 @@
+displayName: "Row Count Anomaly Alert"
+conditions:
+  - displayName: "Row count anomaly detected"
+    conditionThreshold:
+      filter: 'resource.type="aiplatform.googleapis.com/PipelineJob" AND metric.type="logging.googleapis.com/user/row_count_anomaly"'
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 0s
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_COUNT
+combiner: OR
+notificationChannels:
+  - projects/lstm-gp-xr-ue-ee/notificationChannels/9403934653225783109

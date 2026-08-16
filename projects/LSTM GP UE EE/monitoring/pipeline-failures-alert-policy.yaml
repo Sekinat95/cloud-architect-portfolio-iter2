@@ -1,0 +1,13 @@
+displayName: "Pipeline Failure Alert"
+conditions:
+  - displayName: "Pipeline job failures > 0"
+    conditionThreshold:
+      filter: 'resource.type="aiplatform.googleapis.com/PipelineJob" AND metric.type="logging.googleapis.com/user/pipeline_failures"'
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 0s
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_COUNT
+combiner: OR
+notificationChannels: []

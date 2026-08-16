@@ -10,12 +10,32 @@ from kfp.dsl import component, Output, Artifact
         "google-cloud-storage==2.14.0",
     ],
 )
+# def preprocessing(
+#     project_id: str,
+#     raw_data_bucket: str,
+#     train_gcs_path: str,
+#     test_gcs_path: str,
+#     processed_bucket: str,
+#     # LSTM outputs
+#     lstm_train_output: Output[Artifact],
+#     lstm_test_output: Output[Artifact],
+#     lstm_scaler_output: Output[Artifact],
+#     # GP outputs
+#     gp_train_output: Output[Artifact],
+#     gp_test_output: Output[Artifact],
+#     # Config
+#     lstm_lookback: int = 1,
+#     gp_n_samples: int = 5000,#50000,
+#     gp_train_prop: float = 0.7,
+# ):
 def preprocessing(
     project_id: str,
     raw_data_bucket: str,
     train_gcs_path: str,
     test_gcs_path: str,
     processed_bucket: str,
+    bq_dataset: str,
+    pipeline_run_id: str,
     # LSTM outputs
     lstm_train_output: Output[Artifact],
     lstm_test_output: Output[Artifact],
@@ -25,7 +45,7 @@ def preprocessing(
     gp_test_output: Output[Artifact],
     # Config
     lstm_lookback: int = 1,
-    gp_n_samples: int = 5000,#50000,
+    gp_n_samples: int = 5000,
     gp_train_prop: float = 0.7,
 ):
     """
@@ -52,15 +72,27 @@ def preprocessing(
     - 70/30 internal split
     - Saves X_train, y_train, app_train, X_test, y_test, app_test to GCS
     """
+    # import io
+    # import pickle
+    # import numpy as np
+    # import pandas as pd
+    # from copy import deepcopy as dc
+    # from sklearn.preprocessing import MinMaxScaler
+    # from google.cloud import storage
+
+    # gcs_client = storage.Client(project=project_id)
+    #########
     import io
     import pickle
     import numpy as np
     import pandas as pd
     from copy import deepcopy as dc
     from sklearn.preprocessing import MinMaxScaler
-    from google.cloud import storage
+    from google.cloud import storage, bigquery
+    from datetime import datetime, timezone
 
     gcs_client = storage.Client(project=project_id)
+    bq_client = bigquery.Client(project=project_id)
 
     # ------------------------------------------------------------------ #
     # Helpers
@@ -109,6 +141,46 @@ def preprocessing(
 
     train_df = clean(train_df)
     test_df = clean(test_df)
+    def check_data_drift(bq_client, project_id, bq_dataset, current_series, tolerance=0.2):
+        table_id = f"{project_id}.{bq_dataset}.feature_baseline_stats"
+        query = f"""
+            SELECT mean, std
+            FROM `{table_id}`
+            WHERE feature_name = 'Time'
+            ORDER BY created_at ASC
+            LIMIT 1
+        """
+        result = list(bq_client.query(query).result())
+
+        current_mean = current_series.mean()
+        current_std = current_series.std()
+
+        if not result:
+            # No baseline yet — this run becomes the baseline
+            row = {
+                "run_id": pipeline_run_id,
+                "feature_name": "Time",
+                "mean": float(current_mean),
+                "std": float(current_std),
+                "min": float(current_series.min()),
+                "max": float(current_series.max()),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            bq_client.insert_rows_json(table_id, [row])
+            print("No baseline found — this run set as baseline.")
+            return "SUCCESS"
+
+        baseline_mean, baseline_std = result[0].mean, result[0].std
+        mean_shift = abs(current_mean - baseline_mean) / abs(baseline_mean) if baseline_mean != 0 else 0
+        std_shift = abs(current_std - baseline_std) / abs(baseline_std) if baseline_std != 0 else 0
+
+        if mean_shift > tolerance or std_shift > tolerance:
+            print(f"DATA_DRIFT_DETECTED: Time distribution shifted — mean_shift={mean_shift:.1%}, std_shift={std_shift:.1%} (baseline mean={baseline_mean:.4f}, current mean={current_mean:.4f})")
+            return "DATA_DRIFT"
+
+        return "SUCCESS"
+
+    drift_status = check_data_drift(bq_client, project_id, bq_dataset, train_df["Time"])
 
     # ------------------------------------------------------------------ #
     # Step 3 — LSTM branch

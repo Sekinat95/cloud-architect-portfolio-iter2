@@ -51,16 +51,26 @@ def xr_mlops_pipeline(
     # ------------------------------------------------------------------ #
     # Stage 1 — Preprocessing
     # ------------------------------------------------------------------ #
+    # preprocess_task = preprocessing(
+    #     project_id=project_id,
+    #     raw_data_bucket=raw_data_bucket,
+    #     train_gcs_path=train_gcs_path,
+    #     test_gcs_path=test_gcs_path,
+    #     processed_bucket=processed_bucket,
+    #     lstm_lookback=lstm_lookback,
+    #     gp_n_samples=gp_n_samples,
+    #     gp_train_prop=gp_train_prop,
+    # )
+    ####
     preprocess_task = preprocessing(
-        project_id=project_id,
-        raw_data_bucket=raw_data_bucket,
-        train_gcs_path=train_gcs_path,
-        test_gcs_path=test_gcs_path,
-        processed_bucket=processed_bucket,
-        lstm_lookback=lstm_lookback,
-        gp_n_samples=gp_n_samples,
-        gp_train_prop=gp_train_prop,
-    )
+    project_id=project_id,
+    raw_data_bucket=raw_data_bucket,
+    train_gcs_path=train_gcs_path,
+    test_gcs_path=test_gcs_path,
+    processed_bucket=processed_bucket,
+    bq_dataset=bq_dataset,
+    pipeline_run_id=pipeline_run_id,
+)
 
     # ------------------------------------------------------------------ #
     # Stage 2 — Parallel training (LSTM and GP run independently)

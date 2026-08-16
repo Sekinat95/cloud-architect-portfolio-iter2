@@ -47,6 +47,7 @@ def batch_inference(
     import torch
     from google.cloud import storage, bigquery
     from datetime import datetime, timezone
+    import uuid
 
     gcs_client = storage.Client(project=project_id)
     bq_client = bigquery.Client(project=project_id)
@@ -72,6 +73,36 @@ def batch_inference(
         job = bq_client.load_table_from_dataframe(df, table_ref, job_config=job_config)
         job.result()
         print(f"Written {len(df)} rows to {table_ref}")
+
+    def check_prediction_drift(bq_client, project_id, bq_dataset, table_name, current_rmse, tolerance=0.2):
+        """
+        Compares current run's RMSE against the baseline (earliest run's) RMSE.
+        Flags drift if current RMSE deviates by more than `tolerance` (fraction).
+        """
+        query = f"""
+            SELECT SQRT(AVG(squared_error)) AS baseline_rmse
+            FROM `{project_id}.{bq_dataset}.{table_name}`
+            WHERE run_id = (
+                SELECT run_id
+                FROM `{project_id}.{bq_dataset}.{table_name}`
+                ORDER BY run_timestamp ASC
+                LIMIT 1
+            )
+        """
+        result = list(bq_client.query(query).result())
+
+        if not result or result[0].baseline_rmse is None:
+            print(f"No baseline found for {table_name} — skipping drift check (likely first run).")
+            return "SUCCESS"
+
+        baseline_rmse = result[0].baseline_rmse
+        deviation = abs(current_rmse - baseline_rmse) / baseline_rmse if baseline_rmse != 0 else 0
+
+        if deviation > tolerance:
+            print(f"PREDICTION_DRIFT_DETECTED: {table_name} RMSE deviated {deviation:.1%} from baseline ({baseline_rmse:.6f} -> {current_rmse:.6f})")
+            return "PREDICTION_DRIFT"
+
+        return "SUCCESS"
 
     run_timestamp = datetime.now(timezone.utc)
 
@@ -161,4 +192,77 @@ def batch_inference(
     write_to_bigquery(gp_df, "gp_predictions")
     gp_inference_output.uri = f"gs://{model_artefacts_bucket}/gp/inference/"
 
+    lstm_rmse = np.sqrt(squared_errors_lstm.mean())
+    gp_rmse = np.sqrt(squared_errors_gp.mean())
+
+    lstm_drift_status = check_prediction_drift(bq_client, project_id, bq_dataset, "lstm_predictions", lstm_rmse)
+    gp_drift_status = check_prediction_drift(bq_client, project_id, bq_dataset, "gp_predictions", gp_rmse)
+
+
+    # ------------------------------------------------------------------ #
+    # Step 3 — Log run-level metadata
+    # ------------------------------------------------------------------ #
+    def check_row_count_anomaly(input_row_count, lstm_output_row_count, gp_output_row_count, tolerance=0.1):
+        issues = []
+        if input_row_count == 0:
+            issues.append("input_row_count is 0")
+        if lstm_output_row_count == 0:
+            issues.append("lstm_output_row_count is 0")
+        if gp_output_row_count == 0:
+            issues.append("gp_output_row_count is 0")
+
+        if input_row_count > 0:
+            lstm_diff = abs(input_row_count - lstm_output_row_count) / input_row_count
+            gp_diff = abs(input_row_count - gp_output_row_count) / input_row_count
+            if lstm_diff > tolerance:
+                issues.append(f"lstm_output_row_count differs from input by {lstm_diff:.1%}")
+            if gp_diff > tolerance:
+                issues.append(f"gp_output_row_count differs from input by {gp_diff:.1%}")
+
+        if issues:
+            print(f"ROW_COUNT_ANOMALY_DETECTED: {'; '.join(issues)}")
+            return "ROW_COUNT_ANOMALY"
+        return "SUCCESS"
+        
+
+    def log_run_metadata(input_row_count, lstm_output_row_count, gp_output_row_count, status="SUCCESS"):
+        table_id = f"{project_id}.{bq_dataset}.pipeline_runs"
+        row = {
+            "run_id": str(uuid.uuid4()),
+            "run_timestamp": run_timestamp.isoformat(),
+            "pipeline_job_id": pipeline_run_id,
+            "input_row_count": input_row_count,
+            "lstm_output_row_count": lstm_output_row_count,
+            "gp_output_row_count": gp_output_row_count,
+            "status": status,
+        }
+        errors = bq_client.insert_rows_json(table_id, [row])
+        if errors:
+            print(f"Failed to insert run metadata: {errors}")
+        else:
+            print("Run metadata logged successfully.")
+
+    row_status = check_row_count_anomaly(
+        input_row_count=len(X_test_lstm),
+        lstm_output_row_count=len(lstm_df),
+        gp_output_row_count=len(gp_df),
+    )
+
+    overall_status = "SUCCESS"
+    if row_status != "SUCCESS":
+        overall_status = row_status
+    elif "PREDICTION_DRIFT" in (lstm_drift_status, gp_drift_status):
+        overall_status = "PREDICTION_DRIFT"
+
+    log_run_metadata(
+        input_row_count=len(X_test_lstm),
+        lstm_output_row_count=len(lstm_df),
+        gp_output_row_count=len(gp_df),
+        status=overall_status,
+    )
+
     print("=== Batch inference complete ===")
+
+
+    
+    

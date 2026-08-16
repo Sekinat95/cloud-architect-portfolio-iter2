@@ -1,0 +1,14 @@
+displayName: "Pipeline Latency Alert"
+conditions:
+  - displayName: "Pipeline duration exceeds threshold"
+    conditionThreshold:
+      filter: 'resource.type="aiplatform.googleapis.com/PipelineJob" AND metric.type="aiplatform.googleapis.com/pipelinejob/duration"'
+      comparison: COMPARISON_GT
+      thresholdValue: 2700
+      duration: 0s
+      aggregations:
+        - alignmentPeriod: 300s
+          perSeriesAligner: ALIGN_MAX
+combiner: OR
+notificationChannels:
+  - projects/lstm-gp-xr-ue-ee/notificationChannels/9403934653225783109
