@@ -1,0 +1,21 @@
+# INFERENCE PIPELINE FOR FINANCIAL SENTIMENTS ANALYSIS WITH TTS INTEGRATIONS
+
+
+```mermaid
+graph TD
+  GCS["Raw Financial Data"] --> VAPL
+    subgraph VAPL["the pipeline"]
+      DV["Data validation component"] --> PPR
+      PPR["Preprocessing component"] --> BINF["FinBERT predictions"] --> OUT
+      OUT["Bigquery <br/> Batch results"] --> MDLU
+      MDLU["Model Upload <br/> VA Model Registry"] --> DP
+      DP["VA endpoint <br/> online serving"]
+    end
+    subgraph TEST["send live requests <br/> test_endpoint.py"]
+    end
+    subgraph TTS["ElevenLabs <br/> TTS API"]
+    end
+    subgraph TRDWN["Tear down"]
+    end
+   VAPL --> TEST --> TTS --> TRDWN
+```

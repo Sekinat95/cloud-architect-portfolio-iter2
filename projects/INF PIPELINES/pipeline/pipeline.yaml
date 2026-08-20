@@ -1,0 +1,499 @@
+# PIPELINE DEFINITION
+# Name: finbert-inference-pipeline
+# Description: FinBERT financial sentiment inference pipeline on twitter financial sentiments data
+# Inputs:
+#    blob_name: str [Default: 'twitter-financial-sentiment/sent_valid.csv']
+#    bq_dataset: str [Default: 'mlops_predictions']
+#    bq_table: str [Default: 'finbert_predictions']
+#    model_bucket: str [Default: 'inf-pipelines-model-artefacts']
+#    pipeline_run_id: str [Default: 'manual-run-001']
+#    project_id: str [Default: 'inf-pipelines']
+#    raw_data_bucket: str [Default: 'inf-pipelines-raw-data']
+#    region: str [Default: 'europe-west4']
+components:
+  comp-batch-inference:
+    executorLabel: exec-batch-inference
+    inputDefinitions:
+      artifacts:
+        preprocessed_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        pipeline_run_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        predictions_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-data-validation:
+    executorLabel: exec-data-validation
+    inputDefinitions:
+      parameters:
+        blob_name:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        raw_data_bucket:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        validated_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-model-upload:
+    executorLabel: exec-model-upload
+    inputDefinitions:
+      parameters:
+        model_bucket:
+          parameterType: STRING
+        pipeline_run_id:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+        region:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-output-writer:
+    executorLabel: exec-output-writer
+    inputDefinitions:
+      artifacts:
+        predictions_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        bq_dataset:
+          parameterType: STRING
+        bq_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+  comp-preprocessing:
+    executorLabel: exec-preprocessing
+    inputDefinitions:
+      artifacts:
+        validated_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        preprocessed_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+defaultPipelineRoot: gs://inf-pipelines-pipeline-root
+deploymentSpec:
+  executors:
+    exec-batch-inference:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - batch_inference
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas' 'transformers'\
+          \ 'torch'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef batch_inference(\n    preprocessed_dataset: Input[Dataset],\n\
+          \    pipeline_run_id: str,\n    predictions_dataset: Output[Dataset]\n):\n\
+          \    \"\"\"\n    Loads ProsusAI/finbert from Hugging Face.\n    Runs batch\
+          \ inference on all texts.\n    Outputs predictions with confidence scores.\n\
+          \    Label mapping: 0=negative, 1=neutral, 2=positive\n    \"\"\"\n    import\
+          \ pandas as pd\n    import torch\n    from transformers import BertTokenizer,\
+          \ BertForSequenceClassification\n    from datetime import datetime, timezone\n\
+          \n    # Label mapping per dataset README\n    LABEL_MAP = {0: \"positive\"\
+          , 1: \"negative\", 2: \"neutral\"}\n    BATCH_SIZE = 32\n\n    df = pd.read_csv(preprocessed_dataset.path)\n\
+          \    print(f\"Running inference on {len(df)} texts\")\n\n    tokenizer =\
+          \ BertTokenizer.from_pretrained(\"ProsusAI/finbert\")\n    model = BertForSequenceClassification.from_pretrained(\"\
+          ProsusAI/finbert\")\n    model.eval()\n    print(\"FinBERT model loaded\"\
+          )\n\n    all_labels = []\n    all_confidences = []\n\n    for i in range(0,\
+          \ len(df), BATCH_SIZE):\n        batch = df[\"text\"].iloc[i:i+BATCH_SIZE].tolist()\n\
+          \        inputs = tokenizer(\n            batch,\n            return_tensors=\"\
+          pt\",\n            max_length=512,\n            truncation=True,\n     \
+          \       padding=True\n        )\n        with torch.no_grad():\n       \
+          \     outputs = model(**inputs)\n\n        probs = torch.nn.functional.softmax(outputs.logits,\
+          \ dim=-1)\n        predicted_indices = torch.argmax(probs, dim=-1).tolist()\n\
+          \        confidences = probs.max(dim=-1).values.tolist()\n\n        all_labels.extend([LABEL_MAP[idx]\
+          \ for idx in predicted_indices])\n        all_confidences.extend(confidences)\n\
+          \n        if (i // BATCH_SIZE) % 5 == 0:\n            print(f\"Processed\
+          \ {min(i + BATCH_SIZE, len(df))}/{len(df)} texts\")\n\n    run_timestamp\
+          \ = datetime.now(timezone.utc).isoformat()\n\n    df[\"predicted_label\"\
+          ] = all_labels\n    df[\"confidence\"] = all_confidences\n    df[\"correct\"\
+          ] = df[\"predicted_label\"] == df[\"label\"]\n    df[\"run_id\"] = pipeline_run_id\n\
+          \    df[\"run_timestamp\"] = run_timestamp\n\n    accuracy = df[\"correct\"\
+          ].mean()\n    print(f\"Inference complete. Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)\"\
+          )\n    print(f\"Prediction distribution:\\n{df['predicted_label'].value_counts().to_string()}\"\
+          )\n\n    df.to_csv(predictions_dataset.path, index=False)\n    print(f\"\
+          Predictions written to {predictions_dataset.path}\")\n\n"
+        image: python:3.10
+    exec-data-validation:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - data_validation
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas' 'google-cloud-storage'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.17.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef data_validation(\n    project_id: str,\n    raw_data_bucket:\
+          \ str,\n    blob_name: str,\n    validated_dataset: Output[Dataset]\n):\n\
+          \    \"\"\"\n    Reads twitter sentiments CSV from GCS.\n    Validates schema,\
+          \ row count, label set, and null values.\n    Fails fast if any check fails.\n\
+          \    \"\"\"\n    import pandas as pd\n    from google.cloud import storage\n\
+          \    import io\n\n    # Download from GCS\n    client = storage.Client(project=project_id)\n\
+          \    bucket = client.bucket(raw_data_bucket)\n    blob = bucket.blob(blob_name)\n\
+          \    content = blob.download_as_bytes()\n    df = pd.read_csv(io.BytesIO(content))\n\
+          \n    print(f\"Downloaded {len(df)} rows from gs://{raw_data_bucket}/{blob_name}\"\
+          )\n    print(f\"Columns: {df.columns.tolist()}\")\n\n    # Check 1: required\
+          \ columns\n    required_cols = {\"text\", \"label\"}\n    assert required_cols.issubset(df.columns),\
+          \ \\\n        f\"Missing columns. Expected {required_cols}, got {set(df.columns)}\"\
+          \n\n    # Check 2: row count\n    assert 100 < len(df) < 3000, \\\n    \
+          \    f\"Row count {len(df)} out of expected range (100, 3000)\"\n\n    #\
+          \ Check 3: valid label values\n    valid_labels = {\"positive\", \"negative\"\
+          , \"neutral\"}\n    actual_labels = set(df[\"label\"].unique())\n    assert\
+          \ actual_labels.issubset(valid_labels), \\\n        f\"Unexpected labels:\
+          \ {actual_labels - valid_labels}\"\n\n    # Check 4: no nulls in text column\n\
+          \    null_count = df[\"text\"].isnull().sum()\n    assert null_count ==\
+          \ 0, \\\n        f\"Found {null_count} null values in text column\"\n\n\
+          \    print(\"All validation checks passed.\")\n    print(f\"Label distribution:\\\
+          n{df['label'].value_counts().to_string()}\")\n\n    # Write validated dataset\
+          \ as artifact\n    df.to_csv(validated_dataset.path, index=False)\n    print(f\"\
+          Validated dataset written to {validated_dataset.path}\")\n\n"
+        image: python:3.10
+    exec-model-upload:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - model_upload
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'\
+          \ 'google-cloud-storage' 'huggingface_hub'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef model_upload(\n    project_id: str,\n    region: str,\n    model_bucket:\
+          \ str,\n    pipeline_run_id: str\n) -> str:\n    \"\"\"\n    Downloads ProsusAI/finbert\
+          \ raw files from HuggingFace Hub,\n    uploads them to GCS, then registers\
+          \ the model in Vertex AI\n    Model Registry pointing at the GCS artifact_uri\
+          \ (no HF Hub\n    dependency at serving time).\n    \"\"\"\n    import os\n\
+          \    from huggingface_hub import snapshot_download\n    from google.cloud\
+          \ import storage\n    from google.cloud import aiplatform\n\n    CONTAINER_URI\
+          \ = \"us-docker.pkg.dev/deeplearning-platform-release/gcr.io/huggingface-pytorch-inference-cu121.2-2.transformers.4-44.ubuntu2204.py311\"\
+          \n    GCS_PREFIX = f\"finbert/{pipeline_run_id}\"\n\n    # Download raw\
+          \ HF model files locally\n    local_dir = snapshot_download(repo_id=\"ProsusAI/finbert\"\
+          , local_dir=\"/tmp/finbert\")\n    print(f\"Downloaded FinBERT files to\
+          \ {local_dir}\")\n\n    # Upload to GCS\n    client = storage.Client(project=project_id)\n\
+          \    bucket = client.bucket(model_bucket)\n\n    for filename in os.listdir(local_dir):\n\
+          \        local_path = os.path.join(local_dir, filename)\n        if os.path.isfile(local_path):\n\
+          \            blob = bucket.blob(f\"{GCS_PREFIX}/{filename}\")\n        \
+          \    blob.upload_from_filename(local_path)\n            print(f\"Uploaded\
+          \ {filename} to gs://{model_bucket}/{GCS_PREFIX}/{filename}\")\n\n    artifact_uri\
+          \ = f\"gs://{model_bucket}/{GCS_PREFIX}\"\n\n    aiplatform.init(project=project_id,\
+          \ location=region)\n\n    uploaded_model = aiplatform.Model.upload(\n  \
+          \      display_name=f\"finbert-inference-{pipeline_run_id}\",\n        artifact_uri=artifact_uri,\n\
+          \        serving_container_image_uri=CONTAINER_URI,\n        serving_container_environment_variables={\n\
+          \            \"HF_TASK\": \"text-classification\",\n        },\n       \
+          \ serving_container_ports=[8080],\n        description=\"ProsusAI/finbert\
+          \ financial sentiment classifier, GCS-backed artifact.\",\n        labels={\n\
+          \            \"model\": \"finbert\",\n            \"framework\": \"pytorch\"\
+          ,\n        }\n    )\n\n    print(f\"Model registered: {uploaded_model.resource_name}\"\
+          )\n    print(f\"Artifact URI: {artifact_uri}\")\n    return uploaded_model.resource_name\n\
+          \n"
+        image: python:3.10
+    exec-output-writer:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - output_writer
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas' 'google-cloud-bigquery'\
+          \ 'pyarrow' 'db-dtypes'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef output_writer(\n    predictions_dataset: Input[Dataset],\n  \
+          \  project_id: str,\n    bq_dataset: str,\n    bq_table: str\n):\n    import\
+          \ pandas as pd\n    from google.cloud import bigquery\n    from datetime\
+          \ import datetime, timezone\n\n    df = pd.read_csv(predictions_dataset.path)\n\
+          \    print(f\"Writing {len(df)} predictions to BigQuery\")\n    print(f\"\
+          Columns: {df.columns.tolist()}\")\n\n    # Rename ground truth column\n\
+          \    df = df.rename(columns={\"label\": \"ground_truth_label\"})\n\n   \
+          \ # Explicit type casting\n    df[\"text\"] = df[\"text\"].astype(str)\n\
+          \    df[\"predicted_label\"] = df[\"predicted_label\"].astype(str)\n   \
+          \ df[\"confidence\"] = df[\"confidence\"].astype(float)\n    df[\"ground_truth_label\"\
+          ] = df[\"ground_truth_label\"].astype(str)\n    df[\"correct\"] = df[\"\
+          correct\"].astype(bool)\n    df[\"run_id\"] = df[\"run_id\"].astype(str)\n\
+          \n    # Parse run_timestamp as proper datetime for BigQuery TIMESTAMP field\n\
+          \    df[\"run_timestamp\"] = pd.to_datetime(df[\"run_timestamp\"], utc=True)\n\
+          \n    bq_df = df[[\n        \"text\",\n        \"predicted_label\",\n  \
+          \      \"confidence\",\n        \"ground_truth_label\",\n        \"correct\"\
+          ,\n        \"run_id\",\n        \"run_timestamp\"\n    ]]\n\n    client\
+          \ = bigquery.Client(project=project_id)\n    table_ref = f\"{project_id}.{bq_dataset}.{bq_table}\"\
+          \n\n    job_config = bigquery.LoadJobConfig(\n        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,\n\
+          \        schema=[\n            bigquery.SchemaField(\"text\", \"STRING\"\
+          , mode=\"REQUIRED\"),\n            bigquery.SchemaField(\"predicted_label\"\
+          , \"STRING\", mode=\"REQUIRED\"),\n            bigquery.SchemaField(\"confidence\"\
+          , \"FLOAT64\", mode=\"REQUIRED\"),\n            bigquery.SchemaField(\"\
+          ground_truth_label\", \"STRING\", mode=\"REQUIRED\"),\n            bigquery.SchemaField(\"\
+          correct\", \"BOOL\", mode=\"REQUIRED\"),\n            bigquery.SchemaField(\"\
+          run_id\", \"STRING\", mode=\"REQUIRED\"),\n            bigquery.SchemaField(\"\
+          run_timestamp\", \"TIMESTAMP\", mode=\"REQUIRED\"),\n        ]\n    )\n\n\
+          \    job = client.load_table_from_dataframe(bq_df, table_ref, job_config=job_config)\n\
+          \    job.result()\n\n    accuracy = df[\"correct\"].mean()\n    print(f\"\
+          Written to {table_ref}\")\n    print(f\"Total rows: {len(bq_df)}\")\n  \
+          \  print(f\"Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)\")\n\n"
+        image: python:3.10
+    exec-preprocessing:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocessing
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'pandas' 'transformers'\
+          \ 'torch'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kfp==2.17.0' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
+          3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocessing(\n    validated_dataset: Input[Dataset],\n    preprocessed_dataset:\
+          \ Output[Dataset]\n):\n    \"\"\"\n    texts===sentences\n    Tokenises\
+          \ texts using FinBERT tokeniser.\n    Truncates to 512 tokens max.\n   \
+          \ Writes preprocessed dataset with token counts for inspection.\n    \"\"\
+          \"\n    import pandas as pd\n    from transformers import BertTokenizer\n\
+          \n    df = pd.read_csv(validated_dataset.path)\n    print(f\"Loaded {len(df)}\
+          \ rows for preprocessing\")\n\n    tokenizer = BertTokenizer.from_pretrained(\"\
+          ProsusAI/finbert\")\n    print(\"FinBERT tokeniser loaded\")\n\n    # Count\
+          \ tokens per texts \u2014 flag any exceeding 512\n    def count_tokens(text:\
+          \ str) -> int:\n        return len(tokenizer.encode(text, add_special_tokens=True))\n\
+          \n    # def count_tokens(text: str) -> int:\n    #     return len(tokenizer.encode(text,\
+          \ add_special_tokens=True, truncation=True, max_length=512))\n\n    df[\"\
+          token_count\"] = df[\"text\"].apply(count_tokens)\n\n    truncated = df[df[\"\
+          token_count\"] > 512]\n    if len(truncated) > 0:\n        print(f\"Warning:\
+          \ {len(truncated)} texts exceed 512 tokens and will be truncated\")\n  \
+          \  else:\n        print(\"All texts within 512 token limit\")\n\n    print(f\"\
+          Token count stats:\\n{df['token_count'].describe().to_string()}\")\n\n \
+          \   df.to_csv(preprocessed_dataset.path, index=False)\n    print(f\"Preprocessed\
+          \ dataset written to {preprocessed_dataset.path}\")\n\n"
+        image: python:3.10
+pipelineInfo:
+  description: FinBERT financial sentiment inference pipeline on twitter financial
+    sentiments data
+  name: finbert-inference-pipeline
+root:
+  dag:
+    tasks:
+      batch-inference:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-batch-inference
+        dependentTasks:
+        - preprocessing
+        inputs:
+          artifacts:
+            preprocessed_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: preprocessed_dataset
+                producerTask: preprocessing
+          parameters:
+            pipeline_run_id:
+              componentInputParameter: pipeline_run_id
+        taskInfo:
+          name: batch-inference
+      data-validation:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-data-validation
+        inputs:
+          parameters:
+            blob_name:
+              componentInputParameter: blob_name
+            project_id:
+              componentInputParameter: project_id
+            raw_data_bucket:
+              componentInputParameter: raw_data_bucket
+        taskInfo:
+          name: data-validation
+      model-upload:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-model-upload
+        dependentTasks:
+        - batch-inference
+        inputs:
+          parameters:
+            model_bucket:
+              componentInputParameter: model_bucket
+            pipeline_run_id:
+              componentInputParameter: pipeline_run_id
+            project_id:
+              componentInputParameter: project_id
+            region:
+              componentInputParameter: region
+        taskInfo:
+          name: model-upload
+      output-writer:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-output-writer
+        dependentTasks:
+        - batch-inference
+        inputs:
+          artifacts:
+            predictions_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: predictions_dataset
+                producerTask: batch-inference
+          parameters:
+            bq_dataset:
+              componentInputParameter: bq_dataset
+            bq_table:
+              componentInputParameter: bq_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: output-writer
+      preprocessing:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-preprocessing
+        dependentTasks:
+        - data-validation
+        inputs:
+          artifacts:
+            validated_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: validated_dataset
+                producerTask: data-validation
+        taskInfo:
+          name: preprocessing
+  inputDefinitions:
+    parameters:
+      blob_name:
+        defaultValue: twitter-financial-sentiment/sent_valid.csv
+        isOptional: true
+        parameterType: STRING
+      bq_dataset:
+        defaultValue: mlops_predictions
+        isOptional: true
+        parameterType: STRING
+      bq_table:
+        defaultValue: finbert_predictions
+        isOptional: true
+        parameterType: STRING
+      model_bucket:
+        defaultValue: inf-pipelines-model-artefacts
+        isOptional: true
+        parameterType: STRING
+      pipeline_run_id:
+        defaultValue: manual-run-001
+        isOptional: true
+        parameterType: STRING
+      project_id:
+        defaultValue: inf-pipelines
+        isOptional: true
+        parameterType: STRING
+      raw_data_bucket:
+        defaultValue: inf-pipelines-raw-data
+        isOptional: true
+        parameterType: STRING
+      region:
+        defaultValue: europe-west4
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.17.0
