@@ -46,7 +46,6 @@ options:
 substitutions:
   _PROJECT_ID: "inf-pipelines"
   _REGION: "europe-west4"
-
-serviceAccount: "projects/inf-pipelines/serviceAccounts/full-mlops-pipeline-sa@inf-pipelines.iam.gserviceaccount.com"
-
+  
+serviceAccount: "projects/inf-pipelines/serviceAccounts/mlops-pipeline-sa@inf-pipelines.iam.gserviceaccount.com"
   
