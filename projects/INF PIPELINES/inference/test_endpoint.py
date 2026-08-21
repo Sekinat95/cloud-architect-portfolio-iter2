@@ -72,15 +72,22 @@ def main():
                 f"Confidence: {confidence} percent."
             )
 
-            audio = el_client.generate(
-                text=tts_text,
-                voice="Rachel",
-                model="eleven_monolingual_v1"
+            audio = el_client.text_to_speech.convert(
+            text=tts_text,
+            voice_id="pNInz6obpgDQGcFmaJgB",  # Rachel voice ID
+            model_id="eleven_turbo_v2_5",
+            output_format="mp3_44100_128"
             )
 
             output_path = f"output_{i}_{label}.mp3"
-            save(audio, output_path)
-            print(f"Audio saved: {output_path}")
+            with open(output_path, "wb") as f:
+                for chunk in audio:
+                    f.write(chunk)
+            print(f"Audio saved: {output_path}\n")
+
+            # output_path = f"output_{i}_{label}.mp3"
+            # save(audio, output_path)
+            # print(f"Audio saved: {output_path}")
 
             upload_audio_to_gcs(output_path, run_id, storage_client)
             print()
