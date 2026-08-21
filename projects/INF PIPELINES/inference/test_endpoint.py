@@ -28,7 +28,7 @@ def upload_audio_to_gcs(local_path: str, run_id: str, storage_client: storage.Cl
 def main():
     #init
     aiplatform.init(project=PROJECT_ID, location=REGION)
-    el_client = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
+    el_client = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"].strip())
     storage_client = storage.Client(project=PROJECT_ID)
     
 
