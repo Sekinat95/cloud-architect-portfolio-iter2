@@ -1,0 +1,52 @@
+steps:
+  # ------------------------------------------------------------------ #
+  # Step 1 — Install dependencies, compile, upload, and submit pipeline
+  # ------------------------------------------------------------------ #
+  - name: "python:3.10-slim"
+    id: "compile-and-submit"
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        pip install --quiet \
+          kfp==2.7.0 \
+          google-cloud-aiplatform==1.38.1 \
+          google-cloud-storage==2.14.0 && \
+        cd "projects/INF PIPELINES/pipeline" && \
+        python run_pipeline.py
+
+  # ------------------------------------------------------------------ #
+  # Step 2 — Upload compiled pipeline YAML to GCS
+  # ------------------------------------------------------------------ #
+  - name: "gcr.io/cloud-builders/gcloud"
+    id: "upload-pipeline-yaml"
+    args:
+      - storage
+      - cp
+      - "projects/INF PIPELINES/pipeline/pipeline.yaml"
+      - gs://inf-pipelines-pipeline-root/compiled/pipeline.yaml
+
+
+  # ------------------------------------------------------------------ #
+  # Step 2 — Deploy model to endpoint, run single test inference, teardown
+  # ------------------------------------------------------------------ #
+  - name: "python:3.10-slim"
+    id: "test-single-inference"
+    entrypoint: bash
+    args:
+      - "-c"
+      - |
+        pip install --quiet google-cloud-aiplatform==1.38.1 && \
+        cd "projects/INF PIPELINES/inference" && \
+        python test_endpoint.py
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _PROJECT_ID: "inf-pipelines"
+  _REGION: "europe-west4"
+
+serviceAccount: "projects/inf-pipelines/serviceAccounts/full-mlops-pipeline-sa@inf-pipelines.iam.gserviceaccount.com"
+
+  

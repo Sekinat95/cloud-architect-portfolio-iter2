@@ -6,7 +6,6 @@ from google.cloud import aiplatform
 
 PROJECT_ID = "inf-pipelines"
 REGION = "europe-west4"
-MODEL_ID = "1469890915685367808"
 
 TEST_TEXTS = [
     "The company reported record profits this quarter.",
@@ -19,7 +18,8 @@ TEST_TEXTS = [
 def main():
     aiplatform.init(project=PROJECT_ID, location=REGION)
 
-    model = aiplatform.Model(model_name=MODEL_ID)
+    models = aiplatform.Model.list(order_by="create_time desc")
+    model = models[0]  # most recently registered
     print(f"Model: {model.display_name}")
 
     print("Creating endpoint...")

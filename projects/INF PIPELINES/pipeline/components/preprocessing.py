@@ -24,11 +24,11 @@ def preprocessing(
     print("FinBERT tokeniser loaded")
 
     # Count tokens per texts — flag any exceeding 512
-    def count_tokens(text: str) -> int:
-        return len(tokenizer.encode(text, add_special_tokens=True))
-
     # def count_tokens(text: str) -> int:
-    #     return len(tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=512))
+    #     return len(tokenizer.encode(text, add_special_tokens=True))
+
+    def count_tokens(text: str) -> int:
+        return len(tokenizer.encode(text, add_special_tokens=True, truncation=True, max_length=512))
 
     df["token_count"] = df["text"].apply(count_tokens)
 
