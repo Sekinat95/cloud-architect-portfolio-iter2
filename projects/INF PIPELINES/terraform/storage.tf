@@ -24,3 +24,11 @@ resource "google_storage_bucket" "pipeline_root" {
 
   depends_on = [time_sleep.wait_for_apis]
 }
+
+resource "google_storage_bucket" "audio_output" {
+  name          = "${var.project_id}-audio-output"
+  location      = var.region
+  force_destroy = true
+
+  uniform_bucket_level_access = true
+}
