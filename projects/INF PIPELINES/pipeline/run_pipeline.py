@@ -47,6 +47,9 @@ def submit_pipeline():
     print(f"Submitting pipeline run: {RUN_ID}")
     job.submit(service_account=SERVICE_ACCOUNT)
     print(f"Pipeline submitted: {RUN_ID}")
+    job.wait()  # blocks until pipeline job completes
+    print("Pipeline run completed.")
+    #print(f"Pipeline submitted: {RUN_ID}")
     print(f"Monitor: https://console.cloud.google.com/vertex-ai/pipelines?project={PROJECT_ID}")
 
 
