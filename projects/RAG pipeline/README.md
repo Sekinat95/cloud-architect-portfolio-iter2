@@ -30,4 +30,21 @@ OR
 - Client invocation — an MCP client (Claude Desktop config, or another agent) points at your server and calls the tool by name with a query. Intuition: this is the "external link" — anything speaking MCP can now use your RAG pipeline as a capability, without knowing it's LangChain + pgvector under the hood.
 - Connection flow: Client → MCP transport → MCP server → your wrapped pipeline function (R→A→G→postprocessing) → answer → back through transport → client.
 
+## Network connectivity brief overview
+External model (Claude/Gemini/GPT) → MCP server (Cloud Run, API key/OAuth layer) → Serverless VPC Access connector → Cloud SQL Auth Proxy / private IP → Cloud SQL (private IP only, pgvector)
+
+## Monitoring opportunities in this iteration:
+
+- Cloud SQL: connection count, CPU/memory utilization, disk usage — catch capacity issues on your db-f1-micro before they cause failures.
+- MCP endpoint (Cloud Run): request count, latency, error rate, cold start frequency — since this is now a public-facing endpoint external models call.
+- Pipeline-level: retrieval latency, generation latency, RAGAS scores over time (faithfulness/relevance trending down = silent quality drift).
+- Postprocessing: safety filter trigger rate, custom check failure rate — signals if something upstream (bad ingestion, prompt drift) is degrading quality.
+- IAM/auth failures on the MCP layer — repeated failed auth attempts could indicate abuse of the public endpoint.
+
+## MCP wrapper and postprocessing
+Right — the gate goes inside query_rag_pipeline (or a wrapper around it) rather than at the Cloud Run/network layer, since Cloud Run itself is set to allow unauthenticated requests. So the flow is: request reaches your container → your code checks the key/token first → only then calls ask() and returns a result.
+
+
+
+
 
