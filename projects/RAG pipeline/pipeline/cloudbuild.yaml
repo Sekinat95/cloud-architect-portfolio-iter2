@@ -21,3 +21,5 @@ steps:
       - '--region=europe-west4'
 images:
   - 'europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest'
+options:
+  logging: CLOUD_LOGGING_ONLY
