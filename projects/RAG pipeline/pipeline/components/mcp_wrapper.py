@@ -6,6 +6,7 @@ Cloud SQL/pgvector database staying fully private behind it.
 
 import os
 
+import uvicorn
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from generate import ask
@@ -28,20 +29,15 @@ def query_rag_pipeline(question: str) -> dict:
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
 
-    # TODO: replace with your actual Cloud Run *.run.app hostname once deployed
-    # has two-pass deploy caveat (placeholder hostname needs updating after first deploy)
     security = TransportSecuritySettings(
-        allowed_hosts=["rag-pipe-mcp-mcp-server-hkigjsojqa-ez.a.run.app",
-                        "rag-pipe-mcp-mcp-server-hkigjsojqa-ez.a.run.app:*",
-                        "rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app"
-                        "rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app:*",
-                        ],
+        allowed_hosts=[
+            "rag-pipe-mcp-mcp-server-hkigjsojqa-ez.a.run.app",
+            "rag-pipe-mcp-mcp-server-hkigjsojqa-ez.a.run.app:*",
+            "rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app",
+            "rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app:*",
+        ],
         enable_dns_rebinding_protection=True,
     )
 
-    mcp.run(
-        transport="streamable-http",
-        host="0.0.0.0",
-        port=port,
-        transport_security=security,
-    )
+    app = mcp.streamable_http_app(transport_security=security)
+    uvicorn.run(app, host="0.0.0.0", port=port)
