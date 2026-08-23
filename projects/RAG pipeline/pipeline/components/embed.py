@@ -30,6 +30,7 @@ def getconn():
         user=DB_USER,
         db=DB_NAME,
         enable_iam_auth=True,
+        ip_type="PRIVATE",
     )
 
 engine = sqlalchemy.create_engine("postgresql+pg8000://", creator=getconn)
@@ -50,3 +51,10 @@ def embed_and_store(chunks: list[Document]) -> PGVector:
     ids = vectorstore.add_documents(chunks)
     print(f"Embedded and stored {len(ids)} chunk(s) in collection '{COLLECTION_NAME}'")
     return vectorstore
+if __name__ == "__main__":
+    from ingest import load_documents_from_bucket
+    from chunk import chunk_documents
+
+    docs = load_documents_from_bucket()
+    chunks = chunk_documents(docs)
+    embed_and_store(chunks)
