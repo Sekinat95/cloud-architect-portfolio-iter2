@@ -8,6 +8,8 @@ import os
 
 import uvicorn
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 from starlette.routing import Mount
@@ -31,7 +33,7 @@ def query_rag_pipeline(question: str) -> dict:
     return result
 
 
-async def liveness_probe_middleware(request: Request, call_next):
+class LivenessProbeMiddleware(BaseHTTPMiddleware):
     """
     Some MCP client validators (e.g. Mistral's Connector registration check)
     send a bare GET with no session ID to confirm the server is reachable,
@@ -41,13 +43,15 @@ async def liveness_probe_middleware(request: Request, call_next):
     special-cases that one scenario: a GET on /mcp with no session header
     returns 200 directly, without touching real session-based GET handling.
     """
-    if (
-        request.method == "GET"
-        and request.url.path == "/mcp"
-        and "mcp-session-id" not in request.headers
-    ):
-        return PlainTextResponse("OK", status_code=200)
-    return await call_next(request)
+
+    async def dispatch(self, request: Request, call_next):
+        if (
+            request.method == "GET"
+            and request.url.path == "/mcp"
+            and "mcp-session-id" not in request.headers
+        ):
+            return PlainTextResponse("OK", status_code=200)
+        return await call_next(request)
 
 
 if __name__ == "__main__":
@@ -65,7 +69,9 @@ if __name__ == "__main__":
 
     mcp_app = mcp.streamable_http_app(transport_security=security)
 
-    app = Starlette(routes=[Mount("/", app=mcp_app)])
-    app.middleware("http")(liveness_probe_middleware)
+    app = Starlette(
+        routes=[Mount("/", app=mcp_app)],
+        middleware=[Middleware(LivenessProbeMiddleware)],
+    )
 
     uvicorn.run(app, host="0.0.0.0", port=port)
