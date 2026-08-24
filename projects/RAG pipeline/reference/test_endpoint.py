@@ -1,20 +1,44 @@
-"""
-Quick test client for the deployed MCP RAG pipeline server.
-"""
+# """
+# Quick test client for the deployed MCP RAG pipeline server.
+# """
 
+# import asyncio
+# from mcp import Client
+
+# SERVER_URL = "https://rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app/mcp"
+
+
+# async def main() -> None:
+#     async with Client(SERVER_URL) as client:
+#         result = await client.call_tool(
+#             "query_rag_pipeline",
+#             {"question": "What roles is this candidate applying for?"},
+#         )
+#         print(result)
+
+
+# if __name__ == "__main__":
+#     asyncio.run(main())
+######################""
 import asyncio
 from mcp import Client
 
 SERVER_URL = "https://rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app/mcp"
 
+QUESTIONS = [
+    "What roles is this candidate applying for?",
+    "What experience does this candidate have with GCP?",
+    "Has this candidate worked on MLOps pipelines before?",
+]
+
 
 async def main() -> None:
     async with Client(SERVER_URL) as client:
-        result = await client.call_tool(
-            "query_rag_pipeline",
-            {"question": "What roles is this candidate applying for?"},
-        )
-        print(result)
+        for question in QUESTIONS:
+            result = await client.call_tool("query_rag_pipeline", {"question": question})
+            print(f"Q: {question}")
+            print(result)
+            print("---")
 
 
 if __name__ == "__main__":
