@@ -2,6 +2,7 @@
 MCP server exposing the RAG pipeline as a callable tool over Streamable HTTP.
 Deployed on Cloud Run — the MCP server is the public-facing layer, with the
 Cloud SQL/pgvector database staying fully private behind it.
+hhdjd
 """
 
 import os
