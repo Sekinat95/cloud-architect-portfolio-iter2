@@ -66,6 +66,6 @@ if __name__ == "__main__":
     )
 
     app = mcp.streamable_http_app(transport_security=security)
-    app.add_middleware(BaseHTTPMiddleware, dispatch=LivenessProbeMiddleware().dispatch)
+    app.add_middleware(LivenessProbeMiddleware)
 
     uvicorn.run(app, host="0.0.0.0", port=port)
