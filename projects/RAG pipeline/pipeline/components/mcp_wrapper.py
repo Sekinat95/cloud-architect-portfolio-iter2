@@ -7,12 +7,9 @@ Cloud SQL/pgvector database staying fully private behind it.
 import os
 
 import uvicorn
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
-from starlette.routing import Mount
 
 from mcp.server import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
@@ -67,11 +64,7 @@ if __name__ == "__main__":
         enable_dns_rebinding_protection=True,
     )
 
-    mcp_app = mcp.streamable_http_app(transport_security=security)
-
-    app = Starlette(
-        routes=[Mount("/", app=mcp_app)],
-        middleware=[Middleware(LivenessProbeMiddleware)],
-    )
+    app = mcp.streamable_http_app(transport_security=security)
+    app.add_middleware(BaseHTTPMiddleware, dispatch=LivenessProbeMiddleware().dispatch)
 
     uvicorn.run(app, host="0.0.0.0", port=port)
