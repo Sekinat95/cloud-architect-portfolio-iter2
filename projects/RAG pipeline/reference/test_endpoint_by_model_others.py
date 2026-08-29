@@ -2,20 +2,18 @@ import os
 import asyncio
 from mistralai.client import Mistral
 
-print(os.environ["MISTRALAI_API_KEY"])
 client = Mistral(api_key=os.environ["MISTRALAI_API_KEY"])
-#Mistral(api_key="your-mistral-api-key")
-
 
 async def main() -> None:
-    # 1. Register your MCP server as a Connector (one-time setup)
-    connector = await client.beta.connectors.create_async(
+    # # 1. Register your MCP server as a Connector (one-time setup)
+    connector = await client.beta.connectors.update_async(
         name="rag_pipeline_mcp",
         description="RAG pipeline over cover letters via MCP",
         server="https://rag-pipe-mcp-mcp-server-514728048358.europe-west4.run.app/mcp",
-        visibility="private",
+        #visibility="private",
     )
     print(f"Connector created: {connector.id}")
+    
 
     # 2. Authenticate with empty credentials (no auth required on your server)
     await client.beta.connectors.create_or_update_user_credentials_async(
