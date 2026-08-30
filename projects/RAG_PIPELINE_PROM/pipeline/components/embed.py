@@ -54,20 +54,17 @@ def embed_and_store(chunks, batch_size=250):
     
     return vectorstore
 
-
-
-
-def embed_and_store(chunks: list[Document]) -> PGVector:
-    embeddings = get_embeddings()
-    vectorstore = PGVector(
-        embeddings=embeddings,
-        collection_name=COLLECTION_NAME,
-        connection=engine,
-        use_jsonb=True,
-    )
-    ids = vectorstore.add_documents(chunks)
-    print(f"Embedded and stored {len(ids)} chunk(s) in collection '{COLLECTION_NAME}'")
-    return vectorstore
+# def embed_and_store(chunks: list[Document]) -> PGVector:
+#     embeddings = get_embeddings()
+#     vectorstore = PGVector(
+#         embeddings=embeddings,
+#         collection_name=COLLECTION_NAME,
+#         connection=engine,
+#         use_jsonb=True,
+#     )
+#     ids = vectorstore.add_documents(chunks)
+#     print(f"Embedded and stored {len(ids)} chunk(s) in collection '{COLLECTION_NAME}'")
+#     return vectorstore
 
 if __name__ == "__main__":
     from ingest import load_documents_from_bucket
