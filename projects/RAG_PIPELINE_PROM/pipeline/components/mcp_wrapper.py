@@ -31,8 +31,8 @@ if __name__ == "__main__":
 
     security = TransportSecuritySettings(
         allowed_hosts=[
-            "rag-pipe-mcp-mcp-server-hkigjsojqa-ez.a.run.app",
-        
+            "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app",
+            "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app:*",
         ],
         enable_dns_rebinding_protection=True,
     )
