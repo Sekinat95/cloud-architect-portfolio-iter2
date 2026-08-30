@@ -33,6 +33,7 @@ if __name__ == "__main__":
         allowed_hosts=[
             "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app",
             "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app:*",
+            
         ],
         enable_dns_rebinding_protection=True,
     )
