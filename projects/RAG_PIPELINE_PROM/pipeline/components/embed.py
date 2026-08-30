@@ -12,11 +12,11 @@ INSTANCE_NAME = os.environ["CLOUD_SQL_CONNECTION_NAME"]
 DB_NAME = os.environ["DB_NAME"]
 DB_USER = os.environ["DB_USER"].replace(".gserviceaccount.com", "")
 
-# PROJECT_ID = "rag-pipe-mcp"
+# PROJECT_ID = "rag-pipe-mcp-dev"
 # REGION = "europe-west4"
 # INSTANCE_NAME = f"{PROJECT_ID}:{REGION}:{PROJECT_ID}-pg"
-# DB_NAME = "ragdb"
-# DB_USER = "rag-pipe-mcp-pipeline@rag-pipe-mcp.iam"  # SA email, .gserviceaccount.com stripped
+# DB_NAME = "ragdb-dev"
+# DB_USER = "rag-pipe-mcp-dev-pipeline@rag-pipe-mcp-dev.iam"  # SA email, .gserviceaccount.com stripped
 
 COLLECTION_NAME = "rag_poc_chunks"
 EMBEDDING_MODEL = "text-embedding-004"
