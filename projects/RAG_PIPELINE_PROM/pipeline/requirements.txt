@@ -1,0 +1,12 @@
+google-cloud-storage
+google-cloud-logging
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain-google-vertexai
+langchain-postgres
+cloud-sql-python-connector[pg8000]
+sqlalchemy
+pg8000
+pypdf
+mcp[cli]

@@ -1,0 +1,7 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest']
+images:
+  - 'europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest'
