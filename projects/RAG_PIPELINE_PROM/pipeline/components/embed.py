@@ -40,6 +40,23 @@ def get_embeddings():
     return VertexAIEmbeddings(project=PROJECT_ID, location=REGION, model_name=EMBEDDING_MODEL)
 
 
+def embed_and_store(chunks, batch_size=250):
+    embeddings = get_embeddings()
+    vectorstore = PGVector(
+        embeddings=embeddings,
+        collection_name=COLLECTION_NAME,
+        connection=engine,
+        use_jsonb=True,
+    )
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        vectorstore.add_documents(batch)
+    
+    return vectorstore
+
+
+
+
 def embed_and_store(chunks: list[Document]) -> PGVector:
     embeddings = get_embeddings()
     vectorstore = PGVector(
@@ -51,6 +68,7 @@ def embed_and_store(chunks: list[Document]) -> PGVector:
     ids = vectorstore.add_documents(chunks)
     print(f"Embedded and stored {len(ids)} chunk(s) in collection '{COLLECTION_NAME}'")
     return vectorstore
+
 if __name__ == "__main__":
     from ingest import load_documents_from_bucket
     from chunk import chunk_documents
