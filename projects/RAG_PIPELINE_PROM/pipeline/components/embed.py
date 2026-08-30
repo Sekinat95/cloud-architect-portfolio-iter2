@@ -40,7 +40,7 @@ def get_embeddings():
     return VertexAIEmbeddings(project=PROJECT_ID, location=REGION, model_name=EMBEDDING_MODEL)
 
 
-def embed_and_store(chunks, batch_size=250):
+def embed_and_store(chunks, batch_size=25):
     embeddings = get_embeddings()
     vectorstore = PGVector(
         embeddings=embeddings,
