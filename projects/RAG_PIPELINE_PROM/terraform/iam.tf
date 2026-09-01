@@ -54,3 +54,27 @@ resource "google_cloud_run_v2_service_iam_member" "public_invoker" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+resource "google_project_iam_member" "sa_artifactregistry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.pipeline_sa.email}"
+}
+
+resource "google_project_iam_member" "sa_artifactregistry_reader" {
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${google_service_account.pipeline_sa.email}"
+}
+
+resource "google_project_iam_member" "sa_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${google_service_account.pipeline_sa.email}"
+}
+
+resource "google_service_account_iam_member" "sa_self_user" {
+  service_account_id = google_service_account.pipeline_sa.name
+  role                = "roles/iam.serviceAccountUser"
+  member              = "serviceAccount:${google_service_account.pipeline_sa.email}"
+}
