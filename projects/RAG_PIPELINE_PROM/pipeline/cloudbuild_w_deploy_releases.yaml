@@ -6,11 +6,13 @@ steps:
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
-      - 'run'
       - 'deploy'
-      - 'rag-pipe-mcp-dev-mcp-server'
-      - '--image=europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest'
+      - 'releases'
+      - 'create'
+      - 'release-$SHORT_SHA'
+      - '--delivery-pipeline=rag-pipe-mcp-pipeline'
       - '--region=europe-west4'
+      - '--images=mcp-server=europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest'
 images:
   - 'europe-west4-docker.pkg.dev/$PROJECT_ID/mcp-server-repo/mcp-server:latest'
 options:

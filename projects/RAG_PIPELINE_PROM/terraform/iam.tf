@@ -78,3 +78,9 @@ resource "google_service_account_iam_member" "sa_self_user" {
   role                = "roles/iam.serviceAccountUser"
   member              = "serviceAccount:${google_service_account.pipeline_sa.email}"
 }
+
+resource "google_project_iam_member" "sa_clouddeploy_releaser" {
+  project = var.project_id
+  role    = "roles/clouddeploy.releaser"
+  member  = "serviceAccount:${google_service_account.pipeline_sa.email}"
+}
