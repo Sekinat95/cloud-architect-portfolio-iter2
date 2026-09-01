@@ -13,7 +13,8 @@ resource "google_cloud_run_v2_job" "embed_job" {
       }
 
       containers {
-        image   = "europe-west4-docker.pkg.dev/${var.project_id}/mcp-server-repo/mcp-server:latest"
+        #image   = "europe-west4-docker.pkg.dev/${var.project_id}/mcp-server-repo/mcp-server:latest"
+        image = "europe-west4-docker.pkg.dev/rag-pipe-mcp-dev/mcp-server-repo/mcp-server:latest" 
         command = ["python"]
         args    = ["embed.py"]
 

@@ -22,7 +22,8 @@ resource "google_cloud_run_v2_service" "mcp_server" {
     }
 
     containers {
-      image = "europe-west4-docker.pkg.dev/${var.project_id}/mcp-server-repo/mcp-server:latest" #"gcr.io/${var.project_id}/mcp-server:latest" # placeholder until image is built/pushed
+      #image = "europe-west4-docker.pkg.dev/${var.project_id}/mcp-server-repo/mcp-server:latest" 
+      image = "europe-west4-docker.pkg.dev/rag-pipe-mcp-dev/mcp-server-repo/mcp-server:latest"
 
       env {
         name  = "PROJECT_ID"
@@ -54,7 +55,7 @@ resource "google_cloud_run_v2_service" "mcp_server" {
       }
       env {
         name="ALLOWED_HOST"
-        value = "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app"
+        value = "rag-pipe-mcp-p-mcp-server-peiqbzghaq-ez.a.run.app"
       }
     }
   }

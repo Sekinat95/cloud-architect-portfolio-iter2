@@ -1,7 +1,7 @@
 variable "project_id" {
   description = "GCP project ID"
   type        = string
-  default     = "rag-pipe-mcp-dev"
+  default     = "rag-pipe-mcp-p"
 }
 
 variable "region" {
@@ -19,14 +19,14 @@ variable "zone" {
 variable "project_number" {
   description = "GCP project number"
   type        = string
-  default     = "112013505421"
+  default     = "616436024863"
 }
 
 
 variable "ingestion_bucket_name" {
   description = "Name of the bucket that holds raw source documents (separate from the Terraform state bucket)"
   type        = string
-  default     = "rag-pipe-mcp-dev-ingestion"
+  default     = "rag-pipe-mcp-p-ingestion"
 }
 
 variable "db_tier" {
@@ -38,5 +38,5 @@ variable "db_tier" {
 variable "db_name" {
   description = "Name of the Postgres database created on the instance"
   type        = string
-  default     = "ragdb-dev"
+  default     = "ragdb-p"
 }

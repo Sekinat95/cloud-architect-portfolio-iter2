@@ -1,7 +1,8 @@
 import asyncio
 from mcp import Client
 
-SERVER_URL = "https://rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app/mcp"
+SERVER_URL = "https://rag-pipe-mcp-p-mcp-server-peiqbzghaq-ez.a.run.app/mcp"
+#"https://rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app/mcp"
 
 QUESTIONS = [
     "What are the themes of the essays in hashiya?",

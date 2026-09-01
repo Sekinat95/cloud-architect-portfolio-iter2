@@ -13,8 +13,8 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "rag-pipe-mcp-dev-terraform-state"
-    prefix = "rag-mcp-dev"
+    bucket = "rag-pipe-mcp-p-terraform-state"
+    prefix = "rag-mcp-prod"
   }
 }
 
