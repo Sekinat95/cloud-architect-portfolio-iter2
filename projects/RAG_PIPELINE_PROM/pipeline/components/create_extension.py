@@ -14,7 +14,7 @@ REGION = os.environ["REGION"]
 INSTANCE_NAME = os.environ["CLOUD_SQL_CONNECTION_NAME"]
 DB_NAME = os.environ["DB_NAME"]
 POSTGRES_PASSWORD = os.environ["POSTGRES_PASSWORD"]
-PIPELINE_SA_DB_USER = os.environ["DB_USER"] #"rag-pipe-mcp-dev-pipeline@rag-pipe-mcp-dev.iam"
+PIPELINE_SA_DB_USER = os.environ["DB_USER"].replace(".gserviceaccount.com", "") #"rag-pipe-mcp-dev-pipeline@rag-pipe-mcp-dev.iam"
 
 connector = Connector()
 
