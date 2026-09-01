@@ -52,6 +52,10 @@ resource "google_cloud_run_v2_service" "mcp_server" {
         name  = "INGESTION_BUCKET_NAME"
         value = google_storage_bucket.ingestion.name
       }
+      env {
+        name="ALLOWED_HOST"
+        value = "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app"
+      }
     }
   }
 

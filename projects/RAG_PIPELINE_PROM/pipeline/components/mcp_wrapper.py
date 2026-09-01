@@ -28,13 +28,13 @@ def query_rag_pipeline(question: str) -> dict:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
-
+    allowed_host = os.environ["ALLOWED_HOST"]
     security = TransportSecuritySettings(
-        allowed_hosts=[
-            "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app",
-            "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app:*",
-            
-        ],
+        # allowed_hosts=[
+        #     "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app",
+        #     "rag-pipe-mcp-dev-mcp-server-ncdlcaaczq-ez.a.run.app:*",
+        # ],
+        allowed_hosts=[allowed_host, f"{allowed_host}:*"],
         enable_dns_rebinding_protection=True,
     )
 
