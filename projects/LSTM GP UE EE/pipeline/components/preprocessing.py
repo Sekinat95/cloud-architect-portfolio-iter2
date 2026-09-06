@@ -81,7 +81,7 @@ def preprocessing(
         bucket = gcs_client.bucket(bucket_name)
         blob = bucket.blob(blob_path)
         blob.upload_from_string(data)
-        print(f"Uploaded to gs://{bucket_name}/{blob_path}")
+        print(f"Uploaded to gs://{bucket_names}/{blob_path}")#ERROR
 
     def upload_pickle_to_gcs(bucket_name: str, blob_path: str, obj):
         upload_bytes_to_gcs(bucket_name, blob_path, pickle.dumps(obj))
