@@ -11,24 +11,6 @@ from kfp.dsl import component, Output, Artifact
         "google-cloud-bigquery==3.14.1",
     ],
 )
-# def preprocessing(
-#     project_id: str,
-#     raw_data_bucket: str,
-#     train_gcs_path: str,
-#     test_gcs_path: str,
-#     processed_bucket: str,
-#     # LSTM outputs
-#     lstm_train_output: Output[Artifact],
-#     lstm_test_output: Output[Artifact],
-#     lstm_scaler_output: Output[Artifact],
-#     # GP outputs
-#     gp_train_output: Output[Artifact],
-#     gp_test_output: Output[Artifact],
-#     # Config
-#     lstm_lookback: int = 1,
-#     gp_n_samples: int = 5000,#50000,
-#     gp_train_prop: float = 0.7,
-# ):
 def preprocessing(
     project_id: str,
     raw_data_bucket: str,
@@ -73,16 +55,7 @@ def preprocessing(
     - 70/30 internal split
     - Saves X_train, y_train, app_train, X_test, y_test, app_test to GCS
     """
-    # import io
-    # import pickle
-    # import numpy as np
-    # import pandas as pd
-    # from copy import deepcopy as dc
-    # from sklearn.preprocessing import MinMaxScaler
-    # from google.cloud import storage
 
-    # gcs_client = storage.Client(project=project_id)
-    #########
     import io
     import pickle
     import numpy as np
@@ -240,6 +213,10 @@ def preprocessing(
     # ------------------------------------------------------------------ #
     # Step 4 — GP branch
     # ------------------------------------------------------------------ #
+    """
+        currently: data is the first n rows of the dataset (only one app is captured)
+        todo: get n rows of data with multiple apps represented ***
+    """
     print("=== GP Preprocessing ===")
 
     gp_df = train_df.iloc[:gp_n_samples].copy()
