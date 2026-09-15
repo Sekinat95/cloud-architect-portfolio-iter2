@@ -2,8 +2,8 @@ from poller import list_recent_pipeline_jobs, find_failed_jobs
 from graph import app
 
 
-from poller import list_recent_pipeline_jobs, find_failed_jobs
-from graph import app
+# from poller import list_recent_pipeline_jobs, find_failed_jobs
+# from graph import app
 
 def run_once():
     failed = find_failed_jobs(list_recent_pipeline_jobs(hours=48))

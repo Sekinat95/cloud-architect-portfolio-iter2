@@ -1,0 +1,7 @@
+project_id            = "rag-pipe-mcp-p"
+region                = "europe-west4"
+zone                  = "europe-west4-a"
+ingestion_bucket_name = "rag-pipe-mcp-p-ingestion"
+db_tier               = "db-f1-micro"
+db_name               = "ragdb-p"
+project_number        = "616436024863"
