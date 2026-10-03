@@ -24,7 +24,7 @@ graph TD
 ### Introduction: objectives, definitions, scope
 In this project the basic workflow of an inference pipeline for financial sentiments analysis is implemented. <br>
 The objective is to execute both batch and online inference using GCP platform tooling and at the end integrate external APIs.<br>
-This project is entirely implemented with backend functionalities as such, online inference calls are made from file (``call_pipeline.py``)<br>
+This project is entirely implemented with backend functionalities as such, online inference calls are made from file (``test_endpoint.py``)<br>
 ### Components
 There are 6 components of this pipeline end to end:<br>
 1. Data validation: use of twitter financial sentiments data<br>
@@ -39,25 +39,28 @@ By the end, we have the models predictions for the entire test set of the data a
 ## Set-up Instructions
 
 ### File structure
-
+![File Structure](../INF%20PIPELINES/diagram/file_structure.png)
+The project file structure consists of the components, Infrastructure as Code (IaC) and online inference folders. 
 ### Infrastructure as code (IaC)
-### Google Cloud Platform 
+The infrastructure provisioning is done mainly with ``Terraform`` on Google Cloud Platform s(GCP)
+### Google Cloud Platform (GCP)
+1. Storage bucket<br>
+2. Bigquery<br>
+3. Vertex AI (now Gemini Agent platform) (model registry, pipelines, endpoint)<br>
+4. Cloud build<br>
 ### Operations
-
+Continuos integration is carried out through a cloud build trigger. Due to cost management deployment to VA endpoints is detached from the pipeline and is instead executed through a script ``test_endpoint.py``
 
 ## Replication Instructions: Steps
-### GCP console set up
-### gcloud env vars
+### GCP console and cloudshell set up
+Create all terraform GCP files. create all environments variables. Utilise ``Terraform , gcloud and git``
 ### Terraform
-### Provisioning and 
+``terraform init``<br>
+``terraform plan``<br>
+``terraform apply`` <br>
 ### Running
+create  cloud build trigger on GCP console by attaching ``cloudbuild.yaml`` with pipeline running steps.
 
 
 
-## VERSIONS
-This project is divided into versions: 
- - v1-pipeline : end to end inference pipeline of financial sentiments analysis using twitter financial dataset with manual pipeline launch and batch inference.
- - v2-req-endpoint: end to end inference pipeline of financial sentiments analysis using twitter financial dataset with manual pipeline launch and batch inference and live request vertex ai endpoint for single inference requests
- - v3-ci-cd: end to end inference pipeline of financial sentiments analysis using twitter financial dataset with CI/CD and  batch inference and live request vertex ai endpoint for single inference requests
- - v4-tts-api: end to end inference pipeline of financial sentiments analysis using twitter financial dataset with CI/CD and  batch inference and live request vertex ai endpoint for single inference requests and elevenlabs text to speech api
 
