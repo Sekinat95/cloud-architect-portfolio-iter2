@@ -39,7 +39,7 @@ By the end, we have the models predictions for the entire test set of the data a
 ## Set-up Instructions
 
 ### File structure
-![File Structure](../INF%20PIPELINES/diagram/file_structure.png)
+![File Structure](../INF%20PIPELINES/diagram/file_structure.png)<br>
 The project file structure consists of the components, Infrastructure as Code (IaC) and online inference folders. 
 ### Infrastructure as code (IaC)
 The infrastructure provisioning is done mainly with ``Terraform`` on Google Cloud Platform s(GCP)
