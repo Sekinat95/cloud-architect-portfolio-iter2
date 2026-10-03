@@ -27,14 +27,14 @@ The objective is to execute both batch and online inference using GCP platform t
 This project is entirely implemented with backend functionalities as such, online inference calls are made from file (``test_endpoint.py``)<br>
 ### Components
 There are 6 components of this pipeline end to end:<br>
-1. Data validation: use of twitter financial sentiments data<br>
+1. Data validation: [use of twitter financial sentiments data](https://huggingface.co/datasets/zeroshot/twitter-financial-news-sentiment/tree/main)<br>
 2. Data pre-processing: mapping sentiments accurrately in the data according to the model's expecttations<br>
-3. Model Upload: FinBERT is used and is loaded from Hugginface
+3. Model Upload: [FinBERT](https://huggingface.co/ProsusAI/finbert) is used and is loaded from Hugginface
 4. Bigquery Batch inference: Batch inference is done in GCP bigquery and stored<br>
 5. Vertex AI (VA) endpoint online serving (call from file): a script with input query is sent to a provisioned VA endpoint with the model<br>
-6. ElevenLabs Text to Speech (TTS) integration: The model inference outputs from the the online inference is parsed through a TTS api first in order to generate audio of the response.
+6. [ElevenLabs Text to Speech (TTS)](https://elevenlabs.io/text-to-speech-api) integration: The model inference outputs from the the online inference is parsed through a TTS api first in order to generate audio of the response.
 ### Results and Conclusions
-By the end, we have the models predictions for the entire test set of the data as well as the audio files of an online call (when its a request is made)
+By the end, we have the model's predictions for the entire test set of the data as well as the audio files of an online call (when its a request is made).
 
 ## Set-up Instructions
 
