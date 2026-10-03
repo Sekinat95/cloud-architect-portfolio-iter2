@@ -1,7 +1,7 @@
 # INFERENCE PIPELINE FOR FINANCIAL SENTIMENTS ANALYSIS WITH TTS INTEGRATIONS
 ## Architecture Diagram
 
-[Architectural Diagram](../INF%20PIPELINES/diagram/inference%20pipeline.png)
+[Architectural Diagram](../INF%20PIPELINES/diagram/inference%20pipeline.png)!
 ```mermaid
 graph TD
   GCS["Raw Financial Data"] --> VAPL
