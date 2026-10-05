@@ -1,0 +1,26 @@
+apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: rag-pipe-mcp-pipeline
+description: RAG MCP dev to prod promotion
+serialPipeline:
+  stages:
+  - targetId: dev
+  - targetId: prod
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: dev
+description: Dev Cloud Run target
+run:
+  location: projects/rag-pipe-mcp-dev/locations/europe-west4
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: prod
+description: Prod Cloud Run target
+requireApproval: true
+run:
+  location: projects/rag-pipe-mcp-p/locations/europe-west4
