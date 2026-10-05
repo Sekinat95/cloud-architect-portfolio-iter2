@@ -40,10 +40,36 @@ At the end, an MCP client endpoint wrapper is implemented over the RAG tooling t
 1. document ingestion (GCP storage buckets)<br>
 2. document embedding (langchain document loaders)<br>
 3. document spliting, chunk and vector creation (langchain document splitters, pgvector extension)<br>
-4. RAG workflow
+4. R-A-G workflow
 ### Results
 The include a successful request call through the MCP client wrapper to the RAG pipeline and a response in accordance with the documents and safety filters in accordance with checks and balances implemented in the project.<br>
 
 ## Set Up Instructions
-
+### File structure
+![Project File Structure](./diagram/file_structure.png)<br>
+### Insfrastructure as code (IaC)
+![Terraform files](./diagram/terraform_files.png)<br>
+### GCP platform tools
+1. Artefact registry<br>
+2. Cloudrun<br>
+3. Cloudsql (postgresql instance)<br>
+4. Storage buckets<br>
+5. Network<br>
+### Operations: Monitoring, CI/CD, Multi-environment promotion etc
+1. GCP obserbality suite (cloud logging)<br>
+2. Cloud build trigger<br>
+3. dev to prod enviroment promotion<br>
 ## Instant Replication Instructions
+### GCP console and cloud shell set-up
+Create all terraform GCP files. create all environments variables. Utilise ``Terraform`` , ``gcloud`` and ``git``.
+### Terraform
+``terraform init``<br>
+``terraform plan``<br>
+``terraform apply``<br>
+### Operations
+1. R-A-G component deployed on Cloudrun<br>
+2. CI/CD implemented with a cloudbuild trigger<br>
+3. Manual environment promotion from dev-to-prod<br>
+
+
+
