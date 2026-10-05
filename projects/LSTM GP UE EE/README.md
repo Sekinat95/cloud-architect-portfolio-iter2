@@ -1,14 +1,5 @@
-# Long Short Term Memory (LSTM) and Gaussain Process (GP) Extended Reality(XR) User Equipment(UE) Energy Efficiency(EE)
-
-## Introduction
-This is the replication of a project I designed and implemented during my PhD in distributed systems and applied machine learning.
-### Cellular Network Overview
-#### EE for XR
-#### ML-driven EE
-
-### Architectural Overview
-The overview of the end to end pipeline of the XR EE system(ML-side) is available at:
-
+# END TO END MLOps PIPELINE WITH AGENTIC MONITOR
+[Architecture Diagram](../LSTM%20GP%20UE%20EE/diagrams/end%20to%20end%20mlops%20pipeline.png)
 ```mermaid
 graph TD
   GCS["Raw XR service time series data"] --> EEPL
@@ -21,16 +12,41 @@ graph TD
       MDLUGP["GP Model upload <br/> VA Model Registry"] --> TEST
       MDLULSTM["LSTM Model Upload"] --> TEST
     end
-    subgraph TEST["Metric Calculations "]
+    subgraph TEST["Metric Calculations<br/> GCP Observability suite "]
+      
+      MTRC["create metric"] --> ALTPOL
+      ALTPOL["create alert policy for metric"] --> NTFCHN
+      NTFCHN["Notification channel for the alert policy"]
     end
-    subgraph TRDWN["Tear down"]
+    subgraph SAGT["Single Agent Evaluator<br/> over observability"]
+    POL["poll the recent vertex ai jobs"]-->FIL
+    FIL["narrow jobs to ones with metric(failed jobs)"] --> LOG
+    LOG["get the cloud logging error details of failed logs"] -->DRV
+    DRV["Loop: Agent state + langgraph wraps pol, fil, log; <br/> and LLM reads the log details and gives recommendations"] -->TST
+    TST["Test end to end against an engineered log of the metric"] --> DEP
+    DEP["deploy for continuous functioning on cloudrun job + unconditional scheduler"]
     end
 
-  GCS --> EEPL --> TEST --> TRDWN
+  GCS --> EEPL --> TEST --> SAGT
 ```
-## Scope
-### Sections and Components
-#### Monitoring
-## Results
-### Metric Results
+## Brief Description
+### Introduction: Objective, Definitions, Scope
+This is the implementation of the full MLOps pipeline from data ingestion to model monitoring. Its a cloud platform implementation of [a project in my PhD](https://www.researchgate.net/publication/385682682_Prediction-based_Discontinuous_Reception_Mechanism_for_Extended_Reality_Applications). Its conceptual objective is to improve energy efficiency (EE) on extended reality (XR) devices using Long Short Term Memory (LSTM) and Gaussian Process (GP) regression models. <br>
+This google cloud platform (GCP) implementation covers data management( ingestion, preprocessing, drift and skew monitoring), model training, batch inference and model monitoring. It also layers a pipeline evaluatory monitoring agent to demonstrate agentic workflow.<br>
+### Components
+1. data ingestion and preprocessing: using storage buckets<br>
+2. LSTM and GP training: using Vertex AI (VA) pipelines and training<br>
+3. model upload (to VA model registry)<br>
+4. batch inference: using Bigquery<br>
+### Results
+The results of the original work is the comparison of the ML based algorithms to the 3GPP standard for XR device energy efficiency. This covers the metric results of the two algorithms, and the EE-delay tradeoff of the algorithms on the devices compared with the standards <br>
+For the cloud implementation, the results are a combination of the metric results of the two algorithms (i.e. the root mean square error (RMSE)) and GCP observability workflows implemented.<br>
+For the GCP observability, 4 metrics and corresponding alert policies were implemented, namey:<br>
+1. pipeline latency<br>
+2. pipeline failure<br>
+3. prediction drift<br>
+4. row count anomaly (in batch inference)<br>
 
+## Set-up Instructions
+### File structure
+## Instant Replication Instructions
