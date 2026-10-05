@@ -56,7 +56,7 @@ Lastly, an agentic workflow was implemented for the pipeline failure metric for 
 ![File Structure](../LSTM%20GP%20UE%20EE/diagrams/file_structure.png)<br>
 
 ### Infrastructure as Code (IaC)
-[IaC with Terraform](../LSTM%20GP%20UE%20EE/diagrams/terraform_files.png)<br>
+![IaC with Terraform](../LSTM%20GP%20UE%20EE/diagrams/terraform_files.png)<br>
 
 ### GCP Tools
 1. Vertex AI (Now Gemini Agent Platform) pipelines, training, model registry<br>
