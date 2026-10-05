@@ -1,24 +1,26 @@
 graph TD
-  GCS["Data ingestion"] --> RAGPL
+  GCS["Data ingestion"] --> EMBC
+  subgraph EMBC["Vector Embedding"]
+    DOCUP["Document pre-processing <br/> Langchain document loaders"]-->CHNK
+    CHNK["Langchain text splitters"]-->EMB
+    EMB["Vector Embedding <br/> postresql pgvector extension"]
+  end
   subgraph RAGPL["RAG Pipeline"]
-      LGCH["LangChain Document Loaders"] --> LGPRS
-      LGPRS["Preprocessing <br/> Langchain text splitters"] --> VAEMB
-      VAEMB["VA Embedding API <br/> langchain-google-vertexai"] --> STR
-      STR["CloudSQL for postgres"] --> IND
-      IND["pgvector extension via langchain's pgvector"] --> RTV
-      RTV["same storage/indexing instance <br/> langchain retreival interface"] --> AUG
-      AUG["Augmentation and Generation <br/> chatvertexai, langchain lcel chains"] --> RAGPL_END["RAG Output"]
-    end
-
-  subgraph PPRC["Post-processing <br/> custom python checks, API safety filters"]
-  end
-
-  subgraph EVAL["RAGAS package"]
-  end
-
-  subgraph MON["GCP Cloud Observability suite"]
+    R["Retreival <br/> input query --> top-k relevant chunks (pgvector similarity search)"] -->A
+    A["Augmentation <br/> input query + pgvector chunks --> context + question(input query) template(LCEL langchain expression language)"] -->G
+    G["Generation <br/> context + question template (ChatVertexAI) --> LLM (External or Internal Gemini) answer "]
   end
   subgraph MCP["MCP functionality"]
+    USR["user question"] --> MCPC
+    MCPC["MCP Client"] --> RAGPPL
+    %% RAGPPL["RAG Pipeline"]
+  end
+  subgraph RAGPPL ["RAG Pipeline"]
+    OAUTH["API key/ Oauth/ OIDC"] --> RAGP
+    RAGP["RAG pipline"] --> FLT
+    FLT["RAGAS Safety Filters"]
+  end
+  subgraph OBSV["GCP observability suite <br/> Logging enabled on the pipeline"]
   end
 
-  RAGPL --> PPRC --> EVAL --> MON --> MCP
+EMBC --> RAGPL --> MCP --> RAGPPL --> OBSV
