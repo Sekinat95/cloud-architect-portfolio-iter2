@@ -64,6 +64,9 @@
 #### GCP Observability: Monitoring, Logging
 1. Cloud logging is enabled for the build, push and deployment to track the process in case of build and deployment errors. <br>
 
+#### Manual Multi Environment Promotion
+1. The workload is promoted from ``dev`` to ``prod`` manually through human deployment of docker image (in ``artefact registry``) deployed in ``dev`` to ``prod`` environment. <br>
+
 ## Application Design
 The RAG workflow with MCP interface endpoint is a backend operationalisation of the RAG tooling. Retreival Augmented Generation (RAG) is a document querying service that can provide access to document corpuses through vectorised storage and retreival. The core idea of a an RAG service is to combine the generative abilities of large language models (LLMs) with the external knowledge gotten from a separate datasource (usually documents corpuses). RAG takes user query inputs and uses a set of documents from a source as context, feeds both (user input and context) to an LLM which produces the final output. <br>
 ### Document vectorised storage and retreival
