@@ -30,7 +30,12 @@
 4. ``pipeline_sa`` is granted cloudrun ``roles/run.invoker`` <br>
 ### Compute: Docker, Artefact Registry => Cloudrun, CloudrunJobs
 ### Storage
-
+1. This project uses ``rag-pipe-mcp-dev-terraform-state`` to store Terraform states <br>
+2. ``rag-pipe-mcp-dev-ingestion`` is used to store the document corpus before vectorisaion <br> 
+3. ``pipeline_sa`` is granted ``roles/storage.objectAdmin`` to enable document access to and from GCS (to CloudSQL) <br>
+### Database
+1. CloudSQL PostgreSQL 15 instance is used fro vector storage and retreival in this project <br>
+2. It uses the service account ``pipeline_sa`` as its user and thus uses IAM authentication <br>
 ### Operations
 #### CI/CD: Cloudbuild
 
