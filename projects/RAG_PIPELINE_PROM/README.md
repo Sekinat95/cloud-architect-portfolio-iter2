@@ -1,6 +1,8 @@
 
 # INFERENCE PIPELINE FOR FINANCIAL SENTIMENTS ANALYSIS WITH TTS INTEGRATIONS
 [Architectural Diagram](../RAG_PIPELINE_PROM/diagram/RAG%20pipeline%20with%20MCP.png)
+
+<img src="../RAG_PIPELINE_PROM/diagram/RAG%20pipeline%20with%20MCP.png" width="600" height="400">
 ```mermaid
 graph TD
   GCS["Data ingestion"] --> EMBC
