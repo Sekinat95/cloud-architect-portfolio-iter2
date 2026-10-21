@@ -6,4 +6,5 @@
 **/pipeline/__pycache__
 **/pipeline/components/__pycache__
 study
-**__init__.py
+**/pipeline/components/__init__.py
+**/agent/__pycache__
