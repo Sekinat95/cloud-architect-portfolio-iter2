@@ -3,35 +3,7 @@
 
 <img src="../LSTM%20GP%20UE%20EE/diagrams/end%20to%20end%20mlops%20pipeline.png" width="500" height="300">
 
-```mermaid
-graph TD
-  GCS["Raw XR service time series data"] --> EEPL
-    subgraph EEPL["End-to-end pipeline"]
-      PRS["Processed data"] -->GP & LSTM
-      GP["Guassian process regression <br/> training"] --> GPOUT
-      LSTM["Long Short Term Memory <br/> training"] --> LSTMOUT
-      GPOUT["GP Batch Inference"] --> MDLUGP
-      LSTMOUT["LSTM Batch Inference"] --> MDLULSTM
-      MDLUGP["GP Model upload <br/> VA Model Registry"] --> TEST
-      MDLULSTM["LSTM Model Upload"] --> TEST
-    end
-    subgraph TEST["Metric Calculations<br/> GCP Observability suite "]
-      
-      MTRC["create metric"] --> ALTPOL
-      ALTPOL["create alert policy for metric"] --> NTFCHN
-      NTFCHN["Notification channel for the alert policy"]
-    end
-    subgraph SAGT["Single Agent Evaluator<br/> over observability"]
-    POL["poll the recent vertex ai jobs"]-->FIL
-    FIL["narrow jobs to ones with metric(failed jobs)"] --> LOG
-    LOG["get the cloud logging error details of failed logs"] -->DRV
-    DRV["Loop: Agent state + langgraph wraps pol, fil, log; <br/> and LLM reads the log details and gives recommendations"] -->TST
-    TST["Test end to end against an engineered log of the metric"] --> DEP
-    DEP["deploy for continuous functioning on cloudrun job + unconditional scheduler"]
-    end
 
-  GCS --> EEPL --> TEST --> SAGT
-```
 ## Brief Description
 ### Introduction: Objective, Definitions, Scope
 This is the implementation of the full MLOps pipeline from data ingestion to model monitoring. Its a cloud platform implementation of [a project in my PhD](https://www.researchgate.net/publication/385682682_Prediction-based_Discontinuous_Reception_Mechanism_for_Extended_Reality_Applications). Its conceptual objective is to improve energy efficiency (EE) on extended reality (XR) devices using Long Short Term Memory (LSTM) and Gaussian Process (GP) regression models. <br>
