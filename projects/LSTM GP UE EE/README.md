@@ -1,5 +1,8 @@
 # END TO END MLOps PIPELINE WITH AGENTIC MONITOR
 [Architecture Diagram](../LSTM%20GP%20UE%20EE/diagrams/end%20to%20end%20mlops%20pipeline.png)
+
+<img src="../LSTM%20GP%20UE%20EE/diagrams/end%20to%20end%20mlops%20pipeline.png" width="500" height="300">
+
 ```mermaid
 graph TD
   GCS["Raw XR service time series data"] --> EEPL
@@ -51,43 +54,75 @@ For the GCP observability, 4 metrics and corresponding alert policies were imple
 4. row count anomaly (in batch inference)<br>
 
 Lastly, an agentic workflow was implemented for the pipeline failure metric for demonstration.<br>
-## Set-up Instructions
-### File structure
-![File Structure](../LSTM%20GP%20UE%20EE/diagrams/file_structure.png)<br>
-
-### Infrastructure as Code (IaC)
-![IaC with Terraform](../LSTM%20GP%20UE%20EE/diagrams/terraform_files.png)<br>
-
-### GCP Tools
-1. Vertex AI (Now Gemini Agent Platform) pipelines, training, model registry<br>
-  - VA pipelines uses kubeflow pipelines<br>
-2. Bigquery<br>
-3. Storage buckets<br>
-4. Indentity and Access Management(IAM)<br>
-5. GCP observability suite <br>
-  - cloud logging <br>
-  - cloud monitoring <br>
-  - error reporting (alert policies, notification channels)<br>
 
 ### Agentic Workflow
-1. polling<br>
-2. filtering<br>
-3. ``Langgraph`` looping (of polling and filtering)<br>
+1. polling: Create the desired functionality for the metric to be polled.<br>
+2. filtering: Write the cloud logging filter for that metric.<br>
+3. ``Langgraph`` agent state looping (of polling and filtering)<br>
 3. test end to end <br>
 4. deploy on server (``cloudrun job + cloud scheduler``) for continuous polling<br>
 
-## Instant Replication Instructions
-### GCP console and cloud shell setup
-Create all terraform GCP files. create all environments variables. Utilise Terraform , gcloud and git
-
-### Terraform
-``terraform init``<br>
-``terraform plan``<br>
-``terraform apply``<br>
-
-### Agentic Workflow
-- Create the desired functionality for the metric to be polled. <br>
-- Write the cloud logging filter for that metric.<br>
-- Langgraph agent state looping<br>
-- testing and <br>
-- deployment to server (``cloudrun job + cloud scheduler``) and continuos polling<br>
+# INFRASTRUCTURE ARCHITECTURE DETAILS
+## APIs
+1. AI platform ``aiplatform.googleapis.com`` <br>
+2. Bigquery ``bigquery.googleapis.com`` <br>
+3. BigQuery Storage ``bigquerystorage.googleapis.com`` <br>
+4. CloudBuild ``cloudbuild.googleapis.com`` <br>
+5. Cloud Scheduler ``cloudscheduler.googleapis.com`` <br>
+6. Compute ``compute.googleapis.com`` <br>
+7. IAM ``iam.googleapis.com`` <br>
+8. Cloud Resource Manager ``cloudresourcemanager.googleapis.com``<br>
+9. Storage ``storage.googleapis.com`` <br>
+10. Artifact Registry ``artifactregistry.googleapis.com`` <br>
+## BigQuery
+1. One ``google_bigquery_dataset`` called ``xr_predictions`` <br>
+2. Two ``google_bigquery_table``s:<br>
+  - ``lstm_predictions``<br>
+  - ``gp_predictions`` <br>
+## IAM
+1. Set up a service account for the workflow pipeline ``pipeline_sa``<br>
+2. ``pipeline_sa`` is granted the following roles and access levels under ``google_project_iam_member``<br>
+  - ``roles/aiplatform.user`` <br>
+  - ``roles/bigquery.dataEditor`` <br>
+  - ``roles/bigquery.jobUser`` <br>
+  - ``roles/logging.logWriter`` <br>
+  - ``roles/storage.admin``  <br>
+3. ``pipeline_sa`` set to self impersonate under ``google_service_account_iam_member`` with roles
+  - ``roles/iam.serviceAccountUser`` <br>
+  - ``roles/iam.serviceAccountUser`` <br>
+4. cloudbuild service account is granted roles<br>
+  -``cloudbuild_sa_storage`` is granted  ``roles/storage.admin``  <br>
+  - ``cloudbuild_sa_vertex`` is granted ``roles/aiplatform.user`` <br>
+## Storage
+1. 5 storage buckets are used in this project:
+  - ``lstm-gp-xr-ue-ee-terraform-state`` for storing Terraform state <br>
+  - ``raw-data`` bucket <br>
+  - ``model artefact`` bucket <br>
+  - ``pipeline_root`` bucket <br>
+  - ``processed_data`` bucket <br>
+## Operations
+### CI/CD
+1. Pipeline deployement automations are defined in ``cloudbuild.yaml`` <br>
+  - Dependencies installation, compilation and submition of ``xr_mlops_pipeline`` to Vertex AI pipeline via ``run_pipeline`` <br>
+  - Pipeline yaml (compile pipeline) is uploaded to GCS bucket ``pipeline_root`` <br>
+  - Cloud Logging is enabled <br>
+2. Git triggered build are set against the project repository. <br>
+### Observability: Monitoring, Alerts, Notification Channels
+1. Cloud Logging is enabled for pipeline workflow <br>
+2. Custom metrics are defined with alerts and notigication channels <br>
+  - Pipeline latency <br>
+  - Pipeline failure <br>
+  - Prediction Drift <br>
+  - Row count anomalies during batch prediction <br>
+### Agentic Monitor
+1. polling: Create the desired functionality for the metric to be polled.<br>
+2. filtering: Write the cloud logging filter for that metric.<br>
+3. ``Langgraph`` agent state looping (of polling and filtering)<br>
+3. test end to end <br>
+4. deploy on server (``cloudrun job + cloud scheduler``) for continuous polling<br>
+## Pipeline
+1. Data Preprocessing <br>
+2. Parallel training LSTM and GP <br>
+3. Evaluate: RMSE for both models <br>
+4. Model Upload: of both models in VA model registry <br>
+5. Batch Inference in Bigquery <br>
