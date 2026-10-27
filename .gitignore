@@ -4,6 +4,7 @@
 **/.terraform
 **/.terraform.lock.hcl
 **/pipeline/__pycache__
+**/agent/__pycache__
 **/pipeline/components/__pycache__
 **.text
 **.tfstate
