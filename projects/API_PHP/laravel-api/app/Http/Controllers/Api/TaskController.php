@@ -27,4 +27,30 @@ class TaskController extends Controller
 
         return response()->json($task, 201);
     }
+
+    public function show(Task $task): JsonResponse
+    {
+        return response()->json($task);
+    }
+
+    public function update(
+        Request $request,
+        Task $task
+    ): JsonResponse {
+        $validated = $request->validate([
+            'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'completed' => ['sometimes', 'boolean'],
+        ]);
+
+        $task->update($validated);
+
+        return response()->json($task);
+    }
+
+    public function destroy(Task $task): JsonResponse
+    {
+        $task->delete();
+
+        return response()->json(null, 204);
+    }
 }
