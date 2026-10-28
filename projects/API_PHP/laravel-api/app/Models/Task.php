@@ -10,4 +10,11 @@ class Task extends Model
         'title',
         'completed',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'completed' => 'boolean',
+        ];
+    }
 }
